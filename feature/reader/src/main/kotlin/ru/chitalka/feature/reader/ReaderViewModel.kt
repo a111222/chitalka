@@ -114,6 +114,34 @@ class ReaderViewModel @Inject constructor(
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    /** Последняя показанная глава: пока грузится новая, экран держит её и не мигает. */
+    private var lastChapter: LoadedChapter? = null
+
+    val uiState: StateFlow<ReaderUiState> = combine(
+        content,
+        position,
+        nearby,
+        settingsRepository.settings,
+        error,
+    ) { content, position, nearby, settings, error ->
+        val current = position ?: ReadingPosition.Start
+        val chapter = nearby.firstOrNull { it.chapter.index == current.chapterIndex } ?: lastChapter
+        lastChapter = chapter
+        ReaderUiState(
+            title = content?.title.orEmpty(),
+            author = content?.author,
+            language = content?.language,
+            toc = content?.toc.orEmpty(),
+            chapterCount = content?.chapterCount ?: 0,
+            position = current,
+            chapter = chapter,
+            nearby = nearby,
+            settings = settings,
+            isLoading = error == null && (content == null || chapter == null),
+            error = error,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReaderUiState())
+
     init {
         viewModelScope.launch {
             try {

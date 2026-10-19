@@ -244,7 +244,7 @@ private inline fun ContentDrawScope.drawBack(f: Fold, origin: Offset, content: C
         drawIntoCanvas { it.nativeCanvas.drawPath(path.asAndroidPath(), paint) }
     }
     clipPath(path) {
-        content()
+        this@drawBack.content()
         val start = f.mid - origin
         val end = start - f.normal * f.depth
         drawRect(
