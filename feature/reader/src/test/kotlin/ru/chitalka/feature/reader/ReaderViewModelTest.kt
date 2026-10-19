@@ -62,8 +62,9 @@ class ReaderViewModelTest {
             awaitLoaded()
             vm.onEvent(ReaderEvent.GoTo(ReadingPosition(1, 0)))
             assertEquals(1, expectMostRecentItem().chapter?.chapter?.index)
-            vm.onEvent(ReaderEvent.GoTo(ReadingPosition(5, 0))) // такой главы нет
-            assertEquals(ReadingPosition(1, 0), expectMostRecentItem().position)
+            vm.onEvent(ReaderEvent.GoTo(ReadingPosition(5, 0))) // такой главы нет — состояние не меняется
+            expectNoEvents()
+            assertEquals(ReadingPosition(1, 0), vm.uiState.value.position)
         }
         assertEquals(listOf(0, 1), content.requestedChapters)
     }

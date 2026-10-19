@@ -271,9 +271,10 @@ private fun SortChips(state: ShelfUiState, onEvent: (ShelfEvent) -> Unit) {
 @Composable
 private fun BookCover(book: Book, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(4.dp)
-    if (book.coverPath != null) {
+    val coverPath = book.coverPath
+    if (coverPath != null) {
         AsyncImage(
-            model = File(book.coverPath),
+            model = File(coverPath),
             contentDescription = "Обложка «${book.title}»",
             contentScale = ContentScale.Crop,
             modifier = modifier.clip(shape),
