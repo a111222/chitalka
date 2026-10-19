@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import ru.chitalka.core.database.dao.AnnotationDao
 import ru.chitalka.core.database.dao.BookDao
 import ru.chitalka.core.database.dao.ProgressDao
 import ru.chitalka.core.database.entity.BookEntity
@@ -21,6 +22,7 @@ import javax.inject.Inject
 internal class OfflineBookRepository @Inject constructor(
     private val bookDao: BookDao,
     private val progressDao: ProgressDao,
+    private val annotationDao: AnnotationDao,
     private val contentRepository: LocalBookContentRepository,
 ) : BookRepository {
 
@@ -59,7 +61,10 @@ internal class OfflineBookRepository @Inject constructor(
     override suspend fun deleteBook(id: Long) {
         val book = bookDao.getById(id) ?: return
         contentRepository.release(id)
-        bookDao.delete(id) // прогресс, оглавление и закладки удалятся каскадом
+        bookDao.delete(id) // прогресс и оглавление удалятся каскадом
+        // Закладки и цитаты не связаны с books ключом (их можно ставить и в демо-книге): стираем сами
+        annotationDao.deleteBookmarksOf(id)
+        annotationDao.deleteHighlightsOf(id)
         withContext(Dispatchers.IO) {
             File(book.filePath).delete()
             book.coverPath?.let { File(it).delete() }

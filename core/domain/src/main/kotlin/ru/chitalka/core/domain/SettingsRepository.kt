@@ -18,4 +18,6 @@ interface SettingsRepository {
     suspend fun setLineSpacing(spacing: LineSpacing)
 
     suspend fun setHapticsEnabled(enabled: Boolean)
+
+    suspend fun setDailyGoal(minutes: Int)
 }

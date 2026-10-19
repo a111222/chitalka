@@ -8,14 +8,11 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
-import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import kotlinx.serialization.Serializable
-import ru.chitalka.core.designsystem.icon.ChitalkaIcons
 import ru.chitalka.core.designsystem.motion.LocalSharedTransitionScope
 import ru.chitalka.core.designsystem.theme.MotionTokens
+import ru.chitalka.feature.bookmarks.navigation.bookmarksScreen
 import ru.chitalka.feature.library.LibraryFilter
 import ru.chitalka.feature.library.navigation.HomeRoute
 import ru.chitalka.feature.library.navigation.bookDetailScreen
@@ -25,13 +22,7 @@ import ru.chitalka.feature.reader.navigation.navigateToReader
 import ru.chitalka.feature.reader.navigation.readerScreen
 import ru.chitalka.feature.settings.navigation.SettingsRoute
 import ru.chitalka.feature.settings.navigation.settingsScreen
-
-/** Вкладки «Закладки» и «Статистика» наполнятся на шаге 3, пока это заглушки. */
-@Serializable
-data object BookmarksRoute
-
-@Serializable
-data object StatsRoute
+import ru.chitalka.feature.stats.navigation.statsScreen
 
 /**
  * Все переходы между экранами собраны здесь, в app: фичи друг о друге не знают.
@@ -82,25 +73,9 @@ private fun ChitalkaGraph(
             onOpenBookmarks = onOpenBookmarks,
             onOpenSettings = { navController.navigate(SettingsRoute) },
         )
-        comingSoonScreens()
+        bookmarksScreen(onOpenPlace = { bookId, position -> navController.navigateToReader(bookId, position) })
+        statsScreen()
         readerScreen(onBack = { navController.popBackStack() })
         settingsScreen(onBack = { navController.popBackStack() })
-    }
-}
-
-private fun NavGraphBuilder.comingSoonScreens() {
-    composable<BookmarksRoute> {
-        ComingSoonScreen(
-            icon = ChitalkaIcons.Bookmark,
-            title = "Закладки и цитаты",
-            text = "Здесь соберутся страницы, которые вы отметили, и фразы, выделенные маркером.",
-        )
-    }
-    composable<StatsRoute> {
-        ComingSoonScreen(
-            icon = ChitalkaIcons.Stats,
-            title = "Статистика",
-            text = "Здесь появятся минуты чтения по дням, цель на день и серия дней подряд.",
-        )
     }
 }

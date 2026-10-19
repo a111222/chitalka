@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -17,18 +18,25 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import ru.chitalka.core.domain.AnnotationRepository
 import ru.chitalka.core.domain.BookContentRepository
 import ru.chitalka.core.domain.BookRepository
+import ru.chitalka.core.domain.ReadingStatsRepository
 import ru.chitalka.core.domain.SettingsRepository
 import ru.chitalka.core.model.Block
 import ru.chitalka.core.model.BookContent
+import ru.chitalka.core.model.Bookmark
 import ru.chitalka.core.model.Chapter
+import ru.chitalka.core.model.Highlight
+import ru.chitalka.core.model.HighlightColor
 import ru.chitalka.core.model.LineSpacing
 import ru.chitalka.core.model.ReaderFont
 import ru.chitalka.core.model.ReaderSettings
 import ru.chitalka.core.model.ReaderThemeMode
 import ru.chitalka.core.model.ReadingPosition
 import ru.chitalka.core.model.TocEntry
+import java.time.Instant
+import java.time.LocalDate
 import javax.inject.Inject
 
 data class ReaderUiState(
@@ -49,6 +57,9 @@ data class ReaderUiState(
     val settings: ReaderSettings = ReaderSettings(),
     val isLoading: Boolean = true,
     val error: String? = null,
+    /** Закладки и выделения этой книги, во всех главах. */
+    val bookmarks: List<Bookmark> = emptyList(),
+    val highlights: List<Highlight> = emptyList(),
 )
 
 /** Глава и, если в ней нет текста, её картинка (обычно обложка). Сравнивается по ссылке. */
@@ -71,6 +82,30 @@ sealed interface ReaderEvent {
     data class ChangeTheme(val theme: ReaderThemeMode) : ReaderEvent
 
     data class ChangeHaptics(val enabled: Boolean) : ReaderEvent
+
+    /** Провели маркером по фразе: [start]..[end] — смещения в тексте главы. */
+    data class AddHighlight(val chapterIndex: Int, val start: Int, val end: Int, val text: String, val percent: Float) : ReaderEvent
+
+    data class ChangeHighlightColor(val id: Long, val color: HighlightColor) : ReaderEvent
+
+    data class DeleteHighlight(val id: Long) : ReaderEvent
+
+    /**
+     * Закладка на видимой странице (в развороте — на двух): если на ней уже есть закладка, она снимается.
+     * Страница — это смещения с [ReadingPosition.charOffset] до [endOffset] в главе.
+     */
+    data class ToggleBookmark(
+        val position: ReadingPosition,
+        val endOffset: Int,
+        val label: String,
+        val snippet: String,
+        val percent: Float,
+    ) : ReaderEvent
+
+    /** Экран на виду / ушёл с экрана: между ними идут минуты чтения для статистики. */
+    data object Resumed : ReaderEvent
+
+    data object Paused : ReaderEvent
 }
 
 /** Смещение «конец главы»: листая назад, попадаем на последнюю страницу предыдущей главы. */
@@ -83,11 +118,29 @@ class ReaderViewModel @Inject constructor(
     private val bookRepository: BookRepository,
     private val contentRepository: BookContentRepository,
     private val settingsRepository: SettingsRepository,
+    private val annotationRepository: AnnotationRepository,
+    private val statsRepository: ReadingStatsRepository,
 ) : ViewModel() {
 
     /** Аргумент маршрута ReaderRoute(bookId): Navigation кладёт его под именем свойства. */
     private val bookId: Long = savedStateHandle["bookId"] ?: SAMPLE_BOOK_ID
     private val isSample = bookId == SAMPLE_BOOK_ID
+
+    /**
+     * Место, куда открыть книгу вместо сохранённого: из вкладки «Закладки». Используется один раз,
+     * после пересоздания экрана книга откроется там, где читатель остановился.
+     */
+    private val requestedPosition: ReadingPosition? = savedStateHandle.get<Int>("chapterIndex")
+        ?.takeIf { it >= 0 }
+        ?.let { ReadingPosition(it, (savedStateHandle.get<Int>("charOffset") ?: 0).coerceAtLeast(0)) }
+        .also { savedStateHandle["chapterIndex"] = -1 }
+
+    /** Часы для статистики; тесты подменяют их. */
+    internal var now: () -> Long = System::currentTimeMillis
+    internal var today: () -> LocalDate = LocalDate::now
+    private val timer = ReadingTimer { now() }
+    private var resumed = false
+    private var lastShown: ReadingPosition? = null
 
     private val content = MutableStateFlow<BookContent?>(null)
     private val position = MutableStateFlow<ReadingPosition?>(null)
@@ -117,7 +170,7 @@ class ReaderViewModel @Inject constructor(
     /** Последняя показанная глава: пока грузится новая, экран держит её и не мигает. */
     private var lastChapter: LoadedChapter? = null
 
-    val uiState: StateFlow<ReaderUiState> = combine(
+    private val readingState = combine(
         content,
         position,
         nearby,
@@ -140,13 +193,21 @@ class ReaderViewModel @Inject constructor(
             isLoading = error == null && (content == null || chapter == null),
             error = error,
         )
+    }
+
+    val uiState: StateFlow<ReaderUiState> = combine(
+        readingState,
+        annotationRepository.observeBookmarks(bookId),
+        annotationRepository.observeHighlights(bookId),
+    ) { state, bookmarks, highlights ->
+        state.copy(bookmarks = bookmarks, highlights = highlights)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReaderUiState())
 
     init {
         viewModelScope.launch {
             try {
                 val opened = if (isSample) SampleBook.content else contentRepository.open(bookId)
-                val saved = if (isSample) null else bookRepository.observePosition(bookId).first()
+                val saved = requestedPosition ?: if (isSample) null else bookRepository.observePosition(bookId).first()
                 content.value = opened
                 position.value = saved?.coerceIn(opened) ?: ReadingPosition.Start
             } catch (e: CancellationException) {
@@ -173,12 +234,72 @@ class ReaderViewModel @Inject constructor(
             is ReaderEvent.PageShown -> {
                 if (content.value == null) return
                 position.value = event.position
+                // Страница засчитывается, только если листали вперёд: открытие книги и шаг назад не в счёт
+                val turnedForward = lastShown?.let { event.position.isAfter(it) } ?: false
+                lastShown = event.position
+                recordReading(if (resumed) timer.tick() else 0L, if (turnedForward) 1 else 0)
                 // Пример не хранится в базе: сохранять его прогресс некуда
                 if (!isSample) {
                     viewModelScope.launch { bookRepository.savePosition(bookId, event.position, event.percent) }
                 }
             }
+            is ReaderEvent.AddHighlight -> {
+                if (event.end <= event.start || event.text.isBlank()) return
+                val highlight = Highlight(
+                    bookId = bookId,
+                    chapterIndex = event.chapterIndex,
+                    start = event.start,
+                    end = event.end,
+                    text = event.text.trim(),
+                    percent = event.percent,
+                    createdAt = Instant.ofEpochMilli(now()),
+                )
+                save { annotationRepository.addHighlight(highlight) }
+            }
+            is ReaderEvent.ChangeHighlightColor -> save { annotationRepository.changeHighlightColor(event.id, event.color) }
+            is ReaderEvent.DeleteHighlight -> save { annotationRepository.deleteHighlight(event.id) }
+            is ReaderEvent.ToggleBookmark -> {
+                val start = event.position
+                val onPage = uiState.value.bookmarks.filter {
+                    it.position.chapterIndex == start.chapterIndex && it.position.charOffset in start.charOffset until event.endOffset
+                }
+                if (onPage.isNotEmpty()) {
+                    save { onPage.forEach { annotationRepository.deleteBookmark(it.id) } }
+                } else {
+                    val bookmark = Bookmark(
+                        bookId = bookId,
+                        position = start,
+                        label = event.label,
+                        snippet = event.snippet,
+                        percent = event.percent,
+                        createdAt = Instant.ofEpochMilli(now()),
+                    )
+                    save { annotationRepository.addBookmark(bookmark) }
+                }
+            }
+            ReaderEvent.Resumed -> {
+                resumed = true
+                timer.start()
+            }
+            ReaderEvent.Paused -> {
+                resumed = false
+                recordReading(timer.stop(), 0)
+            }
         }
+    }
+
+    /**
+     * Запись не отменяется, даже если экран уже закрывают: иначе потерялись бы последние минуты
+     * чтения и только что поставленная закладка.
+     */
+    private fun save(block: suspend () -> Unit) {
+        viewModelScope.launch(NonCancellable) { block() }
+    }
+
+    private fun recordReading(durationMs: Long, pages: Int) {
+        if (durationMs <= 0 && pages <= 0) return
+        val date = today()
+        save { statsRepository.addReading(bookId, date, durationMs, pages) }
     }
 
     private suspend fun loadChapter(index: Int, reportError: Boolean): LoadedChapter? = try {
@@ -201,3 +322,6 @@ class ReaderViewModel @Inject constructor(
 /** Сохранённое место могло устареть, если книгу переимпортировали с другим числом глав. */
 private fun ReadingPosition.coerceIn(content: BookContent): ReadingPosition =
     if (chapterIndex < content.chapterCount) this else ReadingPosition.Start
+
+private fun ReadingPosition.isAfter(other: ReadingPosition): Boolean =
+    chapterIndex > other.chapterIndex || (chapterIndex == other.chapterIndex && charOffset > other.charOffset)
