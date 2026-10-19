@@ -2,7 +2,7 @@ package ru.chitalka.core.model
 
 /** Настройки чтения. Хранятся в DataStore, а не в базе. */
 data class ReaderSettings(
-    val theme: ReaderThemeMode = ReaderThemeMode.LightOak,
+    val theme: ReaderThemeMode = ReaderThemeMode.Graphite,
     val font: ReaderFont = ReaderFont.Literata,
     val fontSizeSp: Int = DEFAULT_FONT_SIZE,
     val lineSpacing: LineSpacing = LineSpacing.Normal,
@@ -15,8 +15,11 @@ data class ReaderSettings(
     }
 }
 
-/** Три темы из макета v2. */
-enum class ReaderThemeMode { LightOak, DarkWalnut, EInk }
+/**
+ * Оттенок страницы в читалке (макет v3, вкладка «Темы»). Приложение всегда тёмное,
+ * меняется только бумага: графит, почти чёрная полночь или тёплый тёмный.
+ */
+enum class ReaderThemeMode { Graphite, Midnight, Warm }
 
 /** Пять встроенных шрифтов из макета v2 (все с кириллицей, лицензия OFL). */
 enum class ReaderFont(val displayName: String) {

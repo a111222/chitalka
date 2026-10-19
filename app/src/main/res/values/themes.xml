@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Chitalka" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:windowBackground">@color/window_light</item>
+    <!-- Приложение всегда тёмное (макет v3), поэтому окно тёмное и без values-night -->
+    <style name="Theme.Chitalka" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
     </style>
 </resources>

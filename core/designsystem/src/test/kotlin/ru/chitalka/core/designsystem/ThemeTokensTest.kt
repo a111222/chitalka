@@ -23,11 +23,25 @@ class ThemeTokensTest {
         }
     }
 
+    /** Приложение одинаковое во всех оттенках: меняется только страница читалки. */
     @Test
-    fun onlyEInkDisablesEffects() {
-        assertTrue(colorsFor(ReaderThemeMode.EInk).isEInk)
-        assertTrue(!colorsFor(ReaderThemeMode.LightOak).isEInk)
-        assertTrue(colorsFor(ReaderThemeMode.DarkWalnut).isDark)
+    fun pageTonesChangeOnlyThePage() {
+        val graphite = colorsFor(ReaderThemeMode.Graphite)
+        ReaderThemeMode.entries.forEach { mode ->
+            val colors = colorsFor(mode)
+            assertEquals(graphite.background, colors.background)
+            assertEquals(graphite.surface, colors.surface)
+            assertEquals(graphite.accent, colors.accent)
+        }
+        assertTrue(colorsFor(ReaderThemeMode.Midnight).paper.luminance() < graphite.paper.luminance())
+    }
+
+    /** Подписи на карточках читаются и на фоне приложения, и на карточке. */
+    @Test
+    fun secondaryTextIsReadableOnCards() {
+        val colors = colorsFor(ReaderThemeMode.Graphite)
+        assertTrue(contrast(colors.inkSecondary, colors.surface) >= 4.5f)
+        assertTrue(contrast(colors.ink, colors.surfaceHigh) >= 4.5f)
     }
 
     @Test

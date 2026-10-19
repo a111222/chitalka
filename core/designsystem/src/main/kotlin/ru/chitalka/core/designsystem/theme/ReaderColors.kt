@@ -2,83 +2,81 @@ package ru.chitalka.core.designsystem.theme
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
 /**
- * Цвета читалки из макета v2. Экраны никогда не пишут цвет руками,
- * только ReaderTheme.colors.paper, ReaderTheme.colors.shelfGlow и т. п.
+ * Цвета из макета v3: приложение всегда тёмное. Экраны никогда не пишут цвет руками,
+ * только ReaderTheme.colors.surface, ReaderTheme.colors.accent и т. п.
  */
 @Immutable
 data class ReaderColors(
-    /** Фон приложения (стена комнаты). */
+    /** Фон приложения. */
     val background: Color,
-    /** Бумага страницы. */
+    /** Карточки: полки, поле поиска, неактивные чипы. */
+    val surface: Color,
+    /** Приподнятые элементы поверх карточек. */
+    val surfaceHigh: Color,
+    /** Дорожка прогресса и разделители. */
+    val track: Color,
+    /** Бумага страницы в читалке: зависит от выбранного оттенка. */
     val paper: Color,
     /** Основной текст. */
     val ink: Color,
-    /** Вторичный текст: подписи, номер страницы. */
+    /** Вторичный текст: подписи, счётчики, неактивные иконки. */
     val inkSecondary: Color,
-    /** Акцент: тёмная охра днём, латунь ночью. */
+    /** Текст на фоне обложки: «Добрый вечер», автор под каруселью. */
+    val inkSoft: Color,
+    /** Акцент: активная вкладка, выбранный пункт. */
     val accent: Color,
-    /** Дерево шкафа: дуб или орех. */
-    val wood: Color,
-    /** Тень и торцы дерева. */
-    val woodShadow: Color,
-    /** Задняя стенка шкафа. */
-    val wall: Color,
-    /** Тёплый свет светодиода под полкой. В E-Ink прозрачный. */
-    val shelfGlow: Color,
-    /** Линии резьбы (в E-Ink шкаф рисуется только линиями, как гравюра). */
-    val line: Color,
-    val isDark: Boolean,
-    /** E-Ink: без анимаций, теней и градиентов. */
-    val isEInk: Boolean = false,
+    /** Начало и конец фирменного градиента (кнопки, прогресс, активные чипы). */
+    val gradientStart: Color,
+    val gradientEnd: Color,
+    /** Имя автора на карточке книги, подписи в статистике. */
+    val author: Color,
+    /** Звезда оценки. */
+    val star: Color,
+    /** Выделение маркером в тексте. */
+    val highlight: Color,
+    /** Матовое стекло: нижняя панель и шторка «Аа». */
+    val glass: Color,
+) {
+    /** Фирменный розово-фиолетовый градиент слева направо. */
+    val accentBrush: Brush get() = Brush.horizontalGradient(listOf(gradientStart, gradientEnd))
+
+    /** Тот же градиент по диагонали: для круглых и квадратных кнопок. */
+    val accentDiagonal: Brush get() = Brush.linearGradient(listOf(gradientStart, gradientEnd))
+}
+
+private val Base = ReaderColors(
+    background = Color(0xFF191A23),
+    surface = Color(0xFF23242F),
+    surfaceHigh = Color(0xFF2B2D3A),
+    track = Color(0xFF33354A),
+    paper = Color(0xFF191A23),
+    ink = Color(0xFFF2F2F7),
+    inkSecondary = Color(0xFF9A9CB0),
+    inkSoft = Color(0xFFC9CADB),
+    accent = Color(0xFFFF6F9F),
+    gradientStart = Color(0xFFFF4F8B),
+    gradientEnd = Color(0xFF9B5CFF),
+    author = Color(0xFFB48CFF),
+    star = Color(0xFFFFC24B),
+    highlight = Color(0x6B1FB5A0),
+    glass = Color(0xC72B2D3A),
 )
 
-/** Светлая: светлый дуб, бумага цвета слоновой кости. Для дня и яркого света. */
-val LightOakColors = ReaderColors(
-    background = Color(0xFFF3EEE6),
-    paper = Color(0xFFF7F1E5),
-    ink = Color(0xFF2B241D),
-    inkSecondary = Color(0xFF6E6254),
-    accent = Color(0xFF8A5A1F),
-    wood = Color(0xFFB98A5A),
-    woodShadow = Color(0xFF7A5236),
-    wall = Color(0xFFE2D2B8),
-    shelfGlow = Color(0xFFFFF1D6),
-    line = Color(0xFF7A5236),
-    isDark = false,
+/** Графит: страница в цвет приложения. Оттенок по умолчанию. */
+val GraphiteColors = Base
+
+/** Полночь: почти чёрная страница для чтения в темноте. */
+val MidnightColors = Base.copy(paper = Color(0xFF0B0C12))
+
+/** Тёплая: коричневатая бумага и чуть желтоватый текст, мягче для глаз. */
+val WarmColors = Base.copy(
+    paper = Color(0xFF1E1A17),
+    ink = Color(0xFFEDE6DA),
+    inkSecondary = Color(0xFFA39A8C),
 )
 
-/** Тёмная: орех, латунь, тёплые светодиоды. Бумага тёмно-тёплая, а не чёрная. */
-val DarkWalnutColors = ReaderColors(
-    background = Color(0xFF0F0C0A),
-    paper = Color(0xFF1E1B17),
-    ink = Color(0xFFD8CFBF),
-    inkSecondary = Color(0xFF9A8F7F),
-    accent = Color(0xFFE0B46A),
-    wood = Color(0xFF4A2E1C),
-    woodShadow = Color(0xFF25160D),
-    wall = Color(0xFF160E09),
-    shelfGlow = Color(0xFFFFD6A0),
-    line = Color(0xFFE0B46A),
-    isDark = true,
-)
-
-/** E-Ink: 16 оттенков серого, шкаф как гравюра, без свечения. */
-val EInkColors = ReaderColors(
-    background = Color(0xFFECECE8),
-    paper = Color(0xFFF2F2EE),
-    ink = Color(0xFF111111),
-    inkSecondary = Color(0xFF444444),
-    accent = Color(0xFF111111),
-    wood = Color(0xFFF2F2EE),
-    woodShadow = Color(0xFF5A5A5A),
-    wall = Color(0xFFECECE8),
-    shelfGlow = Color.Transparent,
-    line = Color(0xFF111111),
-    isDark = false,
-    isEInk = true,
-)
-
-val LocalReaderColors = staticCompositionLocalOf { LightOakColors }
+val LocalReaderColors = staticCompositionLocalOf { GraphiteColors }

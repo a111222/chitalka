@@ -8,8 +8,8 @@ import ru.chitalka.feature.settings.SettingsRoute as SettingsScreenRoute
 @Serializable
 data object SettingsRoute
 
-fun NavGraphBuilder.settingsScreen() {
+fun NavGraphBuilder.settingsScreen(onBack: () -> Unit) {
     composable<SettingsRoute> {
-        SettingsScreenRoute()
+        SettingsScreenRoute(onBack = onBack)
     }
 }

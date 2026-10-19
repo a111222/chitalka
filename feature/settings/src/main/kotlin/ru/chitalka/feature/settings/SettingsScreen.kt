@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.chitalka.core.designsystem.adaptive.ReadingColumnMaxWidth
+import ru.chitalka.core.designsystem.component.HeaderIconButton
+import ru.chitalka.core.designsystem.icon.ChitalkaIcons
 import ru.chitalka.core.designsystem.theme.ReaderTheme
 import ru.chitalka.core.designsystem.theme.colorsFor
 import ru.chitalka.core.designsystem.typography.ReaderFonts
@@ -44,15 +46,16 @@ import ru.chitalka.core.model.ReaderSettings
 import ru.chitalka.core.model.ReaderThemeMode
 
 @Composable
-internal fun SettingsRoute(viewModel: SettingsViewModel = hiltViewModel()) {
+internal fun SettingsRoute(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    SettingsScreen(state = state, onEvent = viewModel::onEvent)
+    SettingsScreen(state = state, onEvent = viewModel::onEvent, onBack = onBack)
 }
 
 @Composable
 fun SettingsScreen(
     state: SettingsUiState,
     onEvent: (SettingsEvent) -> Unit,
+    onBack: () -> Unit = {},
 ) {
     val colors = ReaderTheme.colors
     val haptics = ReaderTheme.haptics
@@ -68,9 +71,12 @@ fun SettingsScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp),
             ) {
-                Text("Оформление", style = MaterialTheme.typography.headlineLarge)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    HeaderIconButton(ChitalkaIcons.Back, contentDescription = "Назад", onClick = onBack)
+                    Text("Оформление", style = MaterialTheme.typography.headlineLarge)
+                }
 
-                Section("Тема") {
+                Section("Оттенок страницы") {
                     Row(Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         ReaderThemeMode.entries.forEach { mode ->
                             ThemeSwatch(
@@ -187,9 +193,9 @@ private fun ThemeSwatch(
 ) {
     val swatch = colorsFor(mode)
     val label = when (mode) {
-        ReaderThemeMode.LightOak -> "Светлая"
-        ReaderThemeMode.DarkWalnut -> "Тёмная"
-        ReaderThemeMode.EInk -> "E-Ink"
+        ReaderThemeMode.Graphite -> "Графит"
+        ReaderThemeMode.Midnight -> "Полночь"
+        ReaderThemeMode.Warm -> "Тёплая"
     }
     Surface(
         modifier = modifier.selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
@@ -198,7 +204,7 @@ private fun ThemeSwatch(
         shape = RoundedCornerShape(12.dp),
         border = BorderStroke(
             width = if (selected) 2.dp else 1.dp,
-            color = if (selected) ReaderTheme.colors.accent else ReaderTheme.colors.wall,
+            color = if (selected) ReaderTheme.colors.accent else ReaderTheme.colors.track,
         ),
     ) {
         Column(Modifier.padding(12.dp)) {

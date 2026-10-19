@@ -18,7 +18,7 @@ class ReadingPositionTest {
     @Test
     fun defaultSettingsMatchDesign() {
         val settings = ReaderSettings()
-        assertEquals(ReaderThemeMode.LightOak, settings.theme)
+        assertEquals(ReaderThemeMode.Graphite, settings.theme)
         assertEquals(ReaderFont.Literata, settings.font)
         assertEquals(1.65f, settings.lineSpacing.multiplier, 0.001f)
     }
