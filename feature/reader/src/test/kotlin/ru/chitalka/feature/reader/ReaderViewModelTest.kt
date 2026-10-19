@@ -68,7 +68,20 @@ class ReaderViewModelTest {
             expectNoEvents()
             assertEquals(ReadingPosition(1, 0), vm.uiState.value.position)
         }
-        assertEquals(listOf(0, 1), content.requestedChapters)
+        // Каждая глава грузится один раз: соседние берутся про запас и потом не перечитываются
+        assertEquals(listOf(0, 1, 2), content.requestedChapters)
+    }
+
+    @Test
+    fun neighbourChaptersArePreloadedForPageCurl() = runTest {
+        val vm = viewModel(7)
+        vm.uiState.test {
+            awaitLoaded()
+            assertEquals(listOf(0, 1), vm.uiState.value.nearby.map { it.chapter.index })
+            vm.onEvent(ReaderEvent.GoTo(ReadingPosition(1, 0)))
+            assertEquals(listOf(1, 2, 0), vm.uiState.value.nearby.map { it.chapter.index })
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     @Test

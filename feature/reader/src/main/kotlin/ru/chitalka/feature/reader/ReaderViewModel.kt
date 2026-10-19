@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import ru.chitalka.core.domain.BookContentRepository
@@ -41,6 +41,11 @@ data class ReaderUiState(
     val position: ReadingPosition = ReadingPosition.Start,
     /** Загруженная глава. Пока грузится следующая, здесь остаётся предыдущая — экран не мигает. */
     val chapter: LoadedChapter? = null,
+    /**
+     * Текущая глава и её соседи, загруженные заранее: лист можно согнуть и через границу главы,
+     * следующая страница уже готова под ним.
+     */
+    val nearby: List<LoadedChapter> = emptyList(),
     val settings: ReaderSettings = ReaderSettings(),
     val isLoading: Boolean = true,
     val error: String? = null,
@@ -88,34 +93,26 @@ class ReaderViewModel @Inject constructor(
     private val position = MutableStateFlow<ReadingPosition?>(null)
     private val error = MutableStateFlow<String?>(null)
 
-    /** Глава грузится заново, только когда меняется её номер, а не смещение внутри. */
-    private val chapter: StateFlow<LoadedChapter?> = position.filterNotNull()
+    /** Загруженные главы по номеру: текущая и соседние. Читается только из потока [nearby]. */
+    private val chapterCache = mutableMapOf<Int, LoadedChapter>()
+
+    /**
+     * Глава грузится заново, только когда меняется её номер, а не смещение внутри.
+     * Сначала грузится текущая (и сразу показывается), потом соседние — про запас для листания.
+     */
+    private val nearby: StateFlow<List<LoadedChapter>> = position.filterNotNull()
         .map { it.chapterIndex }
         .distinctUntilChanged()
-        .mapLatest { index -> loadChapter(index) }
-        .filterNotNull()
-        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
-
-    val uiState: StateFlow<ReaderUiState> = combine(
-        content,
-        position,
-        chapter,
-        settingsRepository.settings,
-        error,
-    ) { content, position, chapter, settings, error ->
-        ReaderUiState(
-            title = content?.title.orEmpty(),
-            author = content?.author,
-            language = content?.language,
-            toc = content?.toc.orEmpty(),
-            chapterCount = content?.chapterCount ?: 0,
-            position = position ?: ReadingPosition.Start,
-            chapter = chapter,
-            settings = settings,
-            isLoading = error == null && (content == null || chapter == null),
-            error = error,
-        )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReaderUiState())
+        .transformLatest { index ->
+            val count = content.value?.chapterCount ?: 0
+            val wanted = listOf(index, index + 1, index - 1).filter { it in 0 until count }
+            chapterCache.keys.retainAll(wanted.toSet())
+            for (i in wanted) {
+                if (i !in chapterCache) loadChapter(i, reportError = i == index)?.let { chapterCache[i] = it }
+                emit(wanted.mapNotNull { chapterCache[it] })
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     init {
         viewModelScope.launch {
@@ -156,7 +153,7 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
-    private suspend fun loadChapter(index: Int): LoadedChapter? = try {
+    private suspend fun loadChapter(index: Int, reportError: Boolean): LoadedChapter? = try {
         val chapter = if (isSample) SampleBook.chapter else contentRepository.chapter(bookId, index)
         val image = if (chapter.hasText || isSample) {
             null
@@ -167,7 +164,8 @@ class ReaderViewModel @Inject constructor(
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
-        error.value = "Не получилось открыть главу ${index + 1}."
+        // Соседняя глава про запас может и не загрузиться: ошибку показываем только для той, что читают
+        if (reportError) error.value = "Не получилось открыть главу ${index + 1}."
         null
     }
 }

@@ -50,6 +50,9 @@ object MotionTokens {
     val PageSettle: Easing = CubicBezierEasing(0.3f, 0.6f, 0.2f, 1f)
     const val PAGE_TURN_THRESHOLD = 0.25f
 
+    /** Лист, перевёрнутый тапом: уголок по дуге уходит за корешок (как в Apple Books). */
+    const val PAGE_CURL_MS = 620
+
     /** Верхняя и нижняя панели читалки. */
     const val PANELS_MS = 300
 
