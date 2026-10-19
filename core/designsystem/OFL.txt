@@ -1,6 +1,11 @@
 Шрифты в core/designsystem/src/main/res/font распространяются по лицензии SIL Open Font License 1.1:
 - Rubik: Copyright 2015 The Rubik Project Authors (https://github.com/googlefonts/rubik)
 - Playfair Display: Copyright 2017 The Playfair Display Project Authors (https://github.com/clauseggers/Playfair)
+- Literata: Copyright 2017 The Literata Project Authors (https://github.com/googlefonts/literata)
+- PT Serif: Copyright (c) 2010, ParaType Ltd. (http://www.paratype.com/public)
+- Lora: Copyright 2011 The Lora Project Authors (https://github.com/cyrealtype/Lora-Cyrillic)
+- Cormorant Garamond: Copyright 2015 The Cormorant Project Authors (https://github.com/CatharsisFonts/Cormorant)
+- Manrope: Copyright 2018 The Manrope Project Authors (https://github.com/sharanda/manrope)
 
 SIL OPEN FONT LICENSE
 

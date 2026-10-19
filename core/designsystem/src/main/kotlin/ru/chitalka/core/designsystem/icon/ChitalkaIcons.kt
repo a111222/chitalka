@@ -29,6 +29,7 @@ object ChitalkaIcons {
     val Plus: ImageVector by lazy { lineIcon("Plus", "M12 5v14M5 12h14", width = 2f) }
     val ArrowForward: ImageVector by lazy { lineIcon("ArrowForward", "M5 12h14M13 6l6 6-6 6", width = 2f) }
     val Back: ImageVector by lazy { lineIcon("Back", "M15 5l-7 7 7 7", width = 1.9f) }
+    val Contents: ImageVector by lazy { lineIcon("Contents", "M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01", width = 2f) }
     val Close: ImageVector by lazy { lineIcon("Close", "M6 6l12 12M18 6L6 18") }
 
     private fun lineIcon(name: String, pathData: String, width: Float = 1.8f): ImageVector =

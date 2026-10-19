@@ -23,7 +23,10 @@ import ru.chitalka.core.domain.SettingsRepository
 import ru.chitalka.core.model.Block
 import ru.chitalka.core.model.BookContent
 import ru.chitalka.core.model.Chapter
+import ru.chitalka.core.model.LineSpacing
+import ru.chitalka.core.model.ReaderFont
 import ru.chitalka.core.model.ReaderSettings
+import ru.chitalka.core.model.ReaderThemeMode
 import ru.chitalka.core.model.ReadingPosition
 import ru.chitalka.core.model.TocEntry
 import javax.inject.Inject
@@ -52,6 +55,17 @@ sealed interface ReaderEvent {
 
     /** Экран показал страницу: запоминаем место и процент прочитанного. */
     data class PageShown(val position: ReadingPosition, val percent: Float) : ReaderEvent
+
+    /** Шторка «Аа»: шрифт, размер, интервал, оттенок страницы, вибрация. Сохраняются сразу. */
+    data class ChangeFont(val font: ReaderFont) : ReaderEvent
+
+    data class ChangeFontSize(val sizeSp: Int) : ReaderEvent
+
+    data class ChangeSpacing(val spacing: LineSpacing) : ReaderEvent
+
+    data class ChangeTheme(val theme: ReaderThemeMode) : ReaderEvent
+
+    data class ChangeHaptics(val enabled: Boolean) : ReaderEvent
 }
 
 /** Смещение «конец главы»: листая назад, попадаем на последнюю страницу предыдущей главы. */
@@ -63,7 +77,7 @@ class ReaderViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val bookRepository: BookRepository,
     private val contentRepository: BookContentRepository,
-    settingsRepository: SettingsRepository,
+    private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
 
     /** Аргумент маршрута ReaderRoute(bookId): Navigation кладёт его под именем свойства. */
@@ -119,12 +133,20 @@ class ReaderViewModel @Inject constructor(
     }
 
     fun onEvent(event: ReaderEvent) {
-        val count = content.value?.chapterCount ?: return
         when (event) {
+            is ReaderEvent.ChangeFont -> viewModelScope.launch { settingsRepository.setFont(event.font) }
+            is ReaderEvent.ChangeFontSize -> viewModelScope.launch {
+                settingsRepository.setFontSize(event.sizeSp.coerceIn(ReaderSettings.MIN_FONT_SIZE, ReaderSettings.MAX_FONT_SIZE))
+            }
+            is ReaderEvent.ChangeSpacing -> viewModelScope.launch { settingsRepository.setLineSpacing(event.spacing) }
+            is ReaderEvent.ChangeTheme -> viewModelScope.launch { settingsRepository.setTheme(event.theme) }
+            is ReaderEvent.ChangeHaptics -> viewModelScope.launch { settingsRepository.setHapticsEnabled(event.enabled) }
             is ReaderEvent.GoTo -> {
+                val count = content.value?.chapterCount ?: return
                 if (event.position.chapterIndex in 0 until count) position.value = event.position
             }
             is ReaderEvent.PageShown -> {
+                if (content.value == null) return
                 position.value = event.position
                 // Пример не хранится в базе: сохранять его прогресс некуда
                 if (!isSample) {

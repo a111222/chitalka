@@ -7,6 +7,7 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -67,10 +68,10 @@ fun paginate(
 
 /**
  * Блоки главы → размеченный текст. Вид задаёт читалка, а не книга: абзацы по ширине с красной строкой,
- * заголовки по центру, цитаты курсивом с отступом. Смещения символов в этом тексте и есть
+ * заголовки по центру (шрифтом [headingFont], если он задан), цитаты курсивом с отступом. Смещения символов в этом тексте и есть
  * [ru.chitalka.core.model.ReadingPosition.charOffset], поэтому разметка должна быть детерминированной.
  */
-fun chapterText(chapter: Chapter): AnnotatedString = buildAnnotatedString {
+fun chapterText(chapter: Chapter, headingFont: FontFamily? = null): AnnotatedString = buildAnnotatedString {
     val blocks = chapter.blocks.filterNot { it is Block.Image }
         // Глава без текста (обложка, картинка): показываем хотя бы её название
         .ifEmpty { listOfNotNull(chapter.title?.let { Block.Heading(it, 1) }) }
@@ -80,7 +81,7 @@ fun chapterText(chapter: Chapter): AnnotatedString = buildAnnotatedString {
             is Block.Heading -> {
                 if (i > 0) spacer()
                 withStyle(ParagraphStyle(textAlign = TextAlign.Center, lineHeight = 1.3.em)) {
-                    withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, fontSize = headingSize(block.level))) {
+                    withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, fontSize = headingSize(block.level), fontFamily = headingFont)) {
                         append(block.text)
                     }
                 }
