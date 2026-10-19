@@ -68,17 +68,17 @@ internal fun Modifier.paper(paper: Color, edges: PageEdges): Modifier {
             srcOffset = IntOffset.Zero,
             srcSize = IntSize(grain.mottle.width, grain.mottle.height),
             dstSize = IntSize(size.width.toInt(), size.height.toInt()),
-            alpha = 0.05f,
+            alpha = 0.12f,
             filterQuality = FilterQuality.High,
         )
-        drawRect(grainBrush, alpha = 0.045f)
+        drawRect(grainBrush, alpha = 0.09f)
         // Чуть темнее к верху и низу листа: страница не идеально плоская
         drawRect(
             Brush.verticalGradient(
-                0f to Color.Black.copy(alpha = 0.10f),
+                0f to Color.Black.copy(alpha = 0.16f),
                 0.12f to Color.Transparent,
                 0.88f to Color.Transparent,
-                1f to Color.Black.copy(alpha = 0.12f),
+                1f to Color.Black.copy(alpha = 0.18f),
             ),
         )
         if (edges.left > 0f) drawEdges(paper, edges.left, rightSide = false)
@@ -88,10 +88,10 @@ internal fun Modifier.paper(paper: Color, edges: PageEdges): Modifier {
 
 /** Обрез: стопка тонких торцов страниц, каждый следующий чуть темнее, у листа — мягкая тень. */
 private fun DrawScope.drawEdges(paper: Color, share: Float, rightSide: Boolean) {
-    val strip = 1.1.dp.toPx()
-    val count = ceil(2 + share * 5).toInt()
+    val strip = 1.4.dp.toPx()
+    val count = ceil(3 + share * 8).toInt()
     val width = strip * count
-    val light = lerp(paper, Color.White, 0.10f)
+    val light = lerp(paper, Color.White, 0.18f)
     val dark = lerp(paper, Color.Black, 0.35f)
     for (i in 0 until count) {
         // i = 0 — самый внешний торец
@@ -105,10 +105,10 @@ private fun DrawScope.drawEdges(paper: Color, share: Float, rightSide: Boolean) 
     }
     // Тень, которую стопка бросает на лист
     val edge = if (rightSide) size.width - width else width
-    val fall = 10.dp.toPx()
+    val fall = 14.dp.toPx()
     drawRect(
         Brush.horizontalGradient(
-            0f to Color.Black.copy(alpha = 0.28f),
+            0f to Color.Black.copy(alpha = 0.38f),
             1f to Color.Transparent,
             startX = edge,
             endX = if (rightSide) edge - fall else edge + fall,
