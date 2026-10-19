@@ -255,33 +255,33 @@ fun ReaderScreen(
                         isSpread && turn != null -> {
                             // Слева лежит левая страница прежнего разворота, справа под листом — правая следующего.
                             // Сам лист: лицо — правая страница прежнего, оборот — левая следующего.
-                            PageHalf(turn.from, 0, loadedByIndex, left = true, halfWidth, Modifier.align(Alignment.TopStart))
-                            PageHalf(turn.to, 1, loadedByIndex, left = false, halfWidth, Modifier.align(Alignment.TopEnd))
+                            PageHalf(turn.from, 0, loadedByIndex, left = true, halfWidth, bookPercent, Modifier.align(Alignment.TopStart))
+                            PageHalf(turn.to, 1, loadedByIndex, left = false, halfWidth, bookPercent, Modifier.align(Alignment.TopEnd))
                             PageHalf(
-                                turn.from, 1, loadedByIndex, left = false, halfWidth,
+                                turn.from, 1, loadedByIndex, left = false, halfWidth, bookPercent,
                                 Modifier
                                     .align(Alignment.TopEnd)
                                     .pageCurl({ turner.fold() }, Offset(widthPx / 2, 0f), CurlPart.FrontOnly, backPaper),
                             )
                             PageHalf(
-                                turn.to, 0, loadedByIndex, left = true, halfWidth,
+                                turn.to, 0, loadedByIndex, left = true, halfWidth, bookPercent,
                                 Modifier
                                     .align(Alignment.TopStart)
                                     .pageCurl({ turner.fold() }, Offset.Zero, CurlPart.BackOnly, backPaper),
                             )
                         }
                         isSpread -> {
-                            PageHalf(shown, 0, loadedByIndex, left = true, halfWidth, Modifier.align(Alignment.TopStart))
-                            PageHalf(shown, 1, loadedByIndex, left = false, halfWidth, Modifier.align(Alignment.TopEnd))
+                            PageHalf(shown, 0, loadedByIndex, left = true, halfWidth, bookPercent, Modifier.align(Alignment.TopStart))
+                            PageHalf(shown, 1, loadedByIndex, left = false, halfWidth, bookPercent, Modifier.align(Alignment.TopEnd))
                         }
                         turn != null -> {
-                            SinglePage(turn.to, loadedByIndex, pageWidth)
+                            SinglePage(turn.to, loadedByIndex, pageWidth, bookPercent)
                             SinglePage(
-                                turn.from, loadedByIndex, pageWidth,
+                                turn.from, loadedByIndex, pageWidth, bookPercent,
                                 Modifier.pageCurl({ turner.fold() }, Offset.Zero, CurlPart.FrontWithBack, backPaper),
                             )
                         }
-                        else -> SinglePage(shown, loadedByIndex, pageWidth)
+                        else -> SinglePage(shown, loadedByIndex, pageWidth, bookPercent)
                     }
                 }
             }
@@ -336,11 +336,17 @@ fun ReaderScreen(
 
 /** Страница телефона: лист во всю ширину области с непрозрачной бумагой — верхний лист закрывает нижний. */
 @Composable
-private fun SinglePage(spread: Spread, loaded: Map<Int, LoadedChapter>, pageWidth: Dp, modifier: Modifier = Modifier) {
+private fun SinglePage(
+    spread: Spread,
+    loaded: Map<Int, LoadedChapter>,
+    pageWidth: Dp,
+    progress: Float,
+    modifier: Modifier = Modifier,
+) {
     Box(
         modifier
             .fillMaxSize()
-            .background(ReaderTheme.colors.paper),
+            .paper(ReaderTheme.colors.paper, PageEdges(left = progress, right = 1f - progress)),
         contentAlignment = Alignment.TopCenter,
     ) {
         PageView(spread.paged, spread.first, loaded[spread.paged.chapterIndex], Modifier.width(pageWidth))
@@ -358,6 +364,7 @@ private fun PageHalf(
     loaded: Map<Int, LoadedChapter>,
     left: Boolean,
     width: Dp,
+    progress: Float,
     modifier: Modifier = Modifier,
 ) {
     val colors = ReaderTheme.colors
@@ -365,7 +372,7 @@ private fun PageHalf(
         modifier
             .width(width)
             .fillMaxHeight()
-            .background(colors.paper)
+            .paper(colors.paper, if (left) PageEdges(progress, 0f) else PageEdges(0f, 1f - progress))
             .drawWithContent {
                 drawContent()
                 val fall = SpineShadow.toPx()
