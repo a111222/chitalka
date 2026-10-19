@@ -25,6 +25,8 @@ include(":app")
 include(":feature:library")
 include(":feature:reader")
 include(":feature:settings")
+include(":feature:bookmarks")
+include(":feature:stats")
 
 include(":core:model")
 include(":core:domain")

@@ -32,7 +32,16 @@ object ChitalkaIcons {
     val Contents: ImageVector by lazy { lineIcon("Contents", "M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01", width = 2f) }
     val Close: ImageVector by lazy { lineIcon("Close", "M6 6l12 12M18 6L6 18") }
 
-    private fun lineIcon(name: String, pathData: String, width: Float = 1.8f): ImageVector =
+    /** Закладка поставлена: тот же контур, залитый цветом иконки. */
+    val BookmarkFilled: ImageVector by lazy { lineIcon("BookmarkFilled", "M7 4h10v16l-5-4-5 4z", filled = true) }
+    val Copy: ImageVector by lazy { lineIcon("Copy", "M9 9h10v11H9zM5 15V4h10") }
+    val Share: ImageVector by lazy { lineIcon("Share", "M12 4v11M7.5 8.5L12 4l4.5 4.5M5 13v6h14v-6") }
+    val Delete: ImageVector by lazy { lineIcon("Delete", "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3") }
+    val Quote: ImageVector by lazy {
+        lineIcon("Quote", "M10 11H6.5a4 4 0 0 1 4-4M10 11v5H5v-5M19 11h-3.5a4 4 0 0 1 4-4M19 11v5h-5v-5")
+    }
+
+    private fun lineIcon(name: String, pathData: String, width: Float = 1.8f, filled: Boolean = false): ImageVector =
         ImageVector.Builder(
             name = name,
             defaultWidth = 24.dp,
@@ -41,7 +50,7 @@ object ChitalkaIcons {
             viewportHeight = 24f,
         ).addPath(
             pathData = PathParser().parsePathString(pathData).toNodes(),
-            fill = null,
+            fill = if (filled) SolidColor(Color.Black) else null,
             stroke = SolidColor(Color.Black),
             strokeLineWidth = width,
             strokeLineCap = StrokeCap.Round,

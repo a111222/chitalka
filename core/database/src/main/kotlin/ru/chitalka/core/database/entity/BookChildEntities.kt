@@ -35,34 +35,47 @@ data class ReadingProgressEntity(
     val updatedAt: Instant,
 )
 
-@Entity(
-    tableName = "bookmarks",
-    foreignKeys = [ForeignKey(BookEntity::class, ["id"], ["bookId"], onDelete = ForeignKey.CASCADE)],
-    indices = [Index("bookId")],
-)
+/**
+ * Закладки и выделения не привязаны к books внешним ключом: в демонстрационной книге (её нет в базе)
+ * тоже можно ставить закладки. При удалении книги их стирает репозиторий.
+ */
+@Entity(tableName = "bookmarks", indices = [Index("bookId")])
 data class BookmarkEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val bookId: Long,
     val chapterIndex: Int,
     val charOffset: Int,
+    val label: String,
     val snippet: String,
+    val percent: Float,
     val createdAt: Instant,
 )
 
-@Entity(
-    tableName = "highlights",
-    foreignKeys = [ForeignKey(BookEntity::class, ["id"], ["bookId"], onDelete = ForeignKey.CASCADE)],
-    indices = [Index("bookId")],
-)
+@Entity(tableName = "highlights", indices = [Index("bookId")])
 data class HighlightEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val bookId: Long,
     val chapterIndex: Int,
     val startOffset: Int,
     val endOffset: Int,
+    val text: String,
+    /** Цвет маркера: порядковый номер [ru.chitalka.core.model.HighlightColor]. */
     val color: Int,
     val note: String?,
+    val percent: Float,
     val createdAt: Instant,
+)
+
+/**
+ * Сколько читали книгу в один день. [day] — номер дня (LocalDate.toEpochDay) по часам телефона.
+ * Тоже без внешнего ключа: удалили книгу — минуты в статистике остаются.
+ */
+@Entity(tableName = "reading_days", primaryKeys = ["day", "bookId"])
+data class ReadingDayEntity(
+    val day: Long,
+    val bookId: Long,
+    val durationMs: Long,
+    val pages: Int,
 )
 
 /** Полка шкафа. Книга может стоять на нескольких полках (связь через shelf_books). */

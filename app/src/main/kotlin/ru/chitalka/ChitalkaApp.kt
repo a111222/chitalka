@@ -42,9 +42,9 @@ import ru.chitalka.feature.library.SplashScreen
 import ru.chitalka.feature.library.navigation.HomeRoute
 import ru.chitalka.feature.library.navigation.LibraryRoute
 import ru.chitalka.feature.reader.navigation.navigateToReader
-import ru.chitalka.navigation.BookmarksRoute
+import ru.chitalka.feature.bookmarks.navigation.BookmarksRoute
+import ru.chitalka.feature.stats.navigation.StatsRoute
 import ru.chitalka.navigation.ChitalkaNavHost
-import ru.chitalka.navigation.StatsRoute
 import kotlin.reflect.KClass
 
 /** Четыре вкладки нижней панели из видео. */

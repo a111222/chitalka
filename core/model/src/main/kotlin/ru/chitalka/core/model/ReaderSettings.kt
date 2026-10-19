@@ -7,8 +7,13 @@ data class ReaderSettings(
     val fontSizeSp: Int = DEFAULT_FONT_SIZE,
     val lineSpacing: LineSpacing = LineSpacing.Normal,
     val hapticsEnabled: Boolean = true,
+    /** Цель на день во вкладке «Статистика», в минутах. */
+    val dailyGoalMinutes: Int = DEFAULT_DAILY_GOAL,
 ) {
     companion object {
+        const val DEFAULT_DAILY_GOAL = 30
+        val DAILY_GOALS = listOf(10, 15, 20, 30, 45, 60)
+
         const val MIN_FONT_SIZE = 14
         const val MAX_FONT_SIZE = 28
         const val DEFAULT_FONT_SIZE = 18

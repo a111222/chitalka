@@ -25,6 +25,8 @@ dependencies {
     implementation(projects.feature.library)
     implementation(projects.feature.reader)
     implementation(projects.feature.settings)
+    implementation(projects.feature.bookmarks)
+    implementation(projects.feature.stats)
     implementation(projects.core.data)
     implementation(projects.core.designsystem)
 

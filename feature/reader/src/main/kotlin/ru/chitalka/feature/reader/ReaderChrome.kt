@@ -32,9 +32,16 @@ import ru.chitalka.core.designsystem.icon.ChitalkaIcons
 import ru.chitalka.core.designsystem.theme.MotionTokens
 import ru.chitalka.core.designsystem.theme.ReaderTheme
 
-/** Верх читалки из видео: «назад» слева, справа оглавление и «Аа». */
+/** Верх читалки из видео: «назад» слева, справа закладка, оглавление и «Аа». */
 @Composable
-internal fun ReaderTopBar(onBack: () -> Unit, onContents: () -> Unit, contentsEnabled: Boolean, onAppearance: () -> Unit) {
+internal fun ReaderTopBar(
+    onBack: () -> Unit,
+    onContents: () -> Unit,
+    contentsEnabled: Boolean,
+    onAppearance: () -> Unit,
+    bookmarked: Boolean,
+    onBookmark: () -> Unit,
+) {
     val colors = ReaderTheme.colors
     Row(
         Modifier
@@ -45,6 +52,12 @@ internal fun ReaderTopBar(onBack: () -> Unit, onContents: () -> Unit, contentsEn
     ) {
         HeaderIconButton(ChitalkaIcons.Back, contentDescription = "Назад к книге", onClick = onBack)
         Spacer(Modifier.weight(1f))
+        HeaderIconButton(
+            if (bookmarked) ChitalkaIcons.BookmarkFilled else ChitalkaIcons.Bookmark,
+            contentDescription = if (bookmarked) "Убрать закладку" else "Закладка на странице",
+            onClick = onBookmark,
+            tint = if (bookmarked) colors.gradientStart else colors.ink,
+        )
         HeaderIconButton(
             ChitalkaIcons.Contents,
             contentDescription = "Оглавление",

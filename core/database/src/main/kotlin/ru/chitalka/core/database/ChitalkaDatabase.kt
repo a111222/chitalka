@@ -3,12 +3,15 @@ package ru.chitalka.core.database
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import ru.chitalka.core.database.dao.AnnotationDao
 import ru.chitalka.core.database.dao.BookDao
 import ru.chitalka.core.database.dao.ProgressDao
+import ru.chitalka.core.database.dao.StatsDao
 import ru.chitalka.core.database.entity.BookEntity
 import ru.chitalka.core.database.entity.BookFtsEntity
 import ru.chitalka.core.database.entity.BookmarkEntity
 import ru.chitalka.core.database.entity.HighlightEntity
+import ru.chitalka.core.database.entity.ReadingDayEntity
 import ru.chitalka.core.database.entity.ReadingProgressEntity
 import ru.chitalka.core.database.entity.ShelfBookEntity
 import ru.chitalka.core.database.entity.ShelfEntity
@@ -28,8 +31,9 @@ import ru.chitalka.core.database.entity.TocEntryEntity
         HighlightEntity::class,
         ShelfEntity::class,
         ShelfBookEntity::class,
+        ReadingDayEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -37,4 +41,8 @@ abstract class ChitalkaDatabase : RoomDatabase() {
     abstract fun bookDao(): BookDao
 
     abstract fun progressDao(): ProgressDao
+
+    abstract fun annotationDao(): AnnotationDao
+
+    abstract fun statsDao(): StatsDao
 }
