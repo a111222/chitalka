@@ -4,6 +4,8 @@ import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import ru.chitalka.core.domain.BookContentRepository
+import ru.chitalka.core.domain.BookImporter
 import ru.chitalka.core.domain.BookRepository
 import ru.chitalka.core.domain.SettingsRepository
 
@@ -13,6 +15,12 @@ import ru.chitalka.core.domain.SettingsRepository
 internal abstract class DataModule {
     @Binds
     abstract fun bindBookRepository(impl: OfflineBookRepository): BookRepository
+
+    @Binds
+    abstract fun bindBookContentRepository(impl: LocalBookContentRepository): BookContentRepository
+
+    @Binds
+    abstract fun bindBookImporter(impl: LocalBookImporter): BookImporter
 
     @Binds
     abstract fun bindSettingsRepository(impl: OfflineSettingsRepository): SettingsRepository

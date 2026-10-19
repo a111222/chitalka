@@ -1,9 +1,11 @@
 package ru.chitalka.core.data
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import ru.chitalka.core.database.dao.BookDao
 import ru.chitalka.core.database.dao.ProgressDao
 import ru.chitalka.core.database.entity.BookEntity
@@ -11,6 +13,7 @@ import ru.chitalka.core.database.entity.ReadingProgressEntity
 import ru.chitalka.core.domain.BookRepository
 import ru.chitalka.core.model.Book
 import ru.chitalka.core.model.ReadingPosition
+import java.io.File
 import java.time.Instant
 import javax.inject.Inject
 
@@ -18,6 +21,7 @@ import javax.inject.Inject
 internal class OfflineBookRepository @Inject constructor(
     private val bookDao: BookDao,
     private val progressDao: ProgressDao,
+    private val contentRepository: LocalBookContentRepository,
 ) : BookRepository {
 
     override fun observeBooks(): Flow<List<Book>> =
@@ -50,6 +54,16 @@ internal class OfflineBookRepository @Inject constructor(
             ),
         )
         bookDao.markOpened(bookId, Instant.now())
+    }
+
+    override suspend fun deleteBook(id: Long) {
+        val book = bookDao.getById(id) ?: return
+        contentRepository.release(id)
+        bookDao.delete(id) // прогресс, оглавление и закладки удалятся каскадом
+        withContext(Dispatchers.IO) {
+            File(book.filePath).delete()
+            book.coverPath?.let { File(it).delete() }
+        }
     }
 }
 

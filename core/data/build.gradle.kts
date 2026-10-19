@@ -9,6 +9,7 @@ android {
 
 dependencies {
     api(projects.core.domain)
+    implementation(projects.core.bookparser)
     implementation(projects.core.database)
     implementation(projects.core.datastore)
 }

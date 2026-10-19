@@ -30,4 +30,10 @@ class FakeBookRepository(initial: List<Book> = emptyList()) : BookRepository {
     override suspend fun savePosition(bookId: Long, position: ReadingPosition, percent: Float) {
         positions.update { it + (bookId to position) }
     }
+
+    override suspend fun deleteBook(id: Long) {
+        books.update { list -> list.filterNot { it.id == id } }
+    }
+
+    fun positionOf(bookId: Long): ReadingPosition? = positions.value[bookId]
 }

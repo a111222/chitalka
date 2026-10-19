@@ -13,6 +13,7 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -20,9 +21,12 @@ import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import ru.chitalka.core.designsystem.theme.ReaderTheme
 import ru.chitalka.feature.library.navigation.LibraryRoute
 import ru.chitalka.feature.reader.navigation.ReaderRoute
+import ru.chitalka.feature.reader.navigation.navigateToReader
 import ru.chitalka.feature.settings.navigation.SettingsRoute
 import ru.chitalka.navigation.ChitalkaNavHost
 import kotlin.reflect.KClass
@@ -37,8 +41,11 @@ private enum class TopLevelDestination(val label: String, val icon: ImageVector,
  * на телефоне — нижняя панель, на планшете — боковая колонка. В режиме чтения навигация скрыта.
  */
 @Composable
-fun ChitalkaApp() {
+fun ChitalkaApp(openBookRequests: Flow<Long> = emptyFlow()) {
     val navController = rememberNavController()
+    LaunchedEffect(openBookRequests) {
+        openBookRequests.collect { bookId -> navController.navigateToReader(bookId) }
+    }
     val backStackEntry by navController.currentBackStackEntryAsState()
     val destination = backStackEntry?.destination
     val isReading = destination?.hasRoute(ReaderRoute::class) == true

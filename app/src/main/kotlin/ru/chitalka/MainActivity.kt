@@ -1,5 +1,6 @@
 package ru.chitalka
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -22,6 +23,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // При повороте экрана intent тот же — второй раз книгу не импортируем
+        if (savedInstanceState == null) handleViewIntent(intent)
         setContent {
             val settings by viewModel.settings.collectAsStateWithLifecycle()
             val current = settings ?: ReaderSettings()
@@ -29,10 +32,20 @@ class MainActivity : ComponentActivity() {
                 // Ширина окна считается один раз здесь и передаётся вниз всем экранам
                 BoxWithConstraints {
                     CompositionLocalProvider(LocalWindowWidth provides WindowWidth.fromWidth(maxWidth)) {
-                        ChitalkaApp()
+                        ChitalkaApp(openBookRequests = viewModel.openBookRequests)
                     }
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleViewIntent(intent)
+    }
+
+    private fun handleViewIntent(intent: Intent?) {
+        val uri = intent?.data
+        if (intent?.action == Intent.ACTION_VIEW && uri != null) viewModel.openExternalFile(uri.toString())
     }
 }
