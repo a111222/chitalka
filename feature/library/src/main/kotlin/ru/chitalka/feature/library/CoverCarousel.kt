@@ -1,6 +1,11 @@
 package ru.chitalka.feature.library
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animate
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
@@ -18,6 +23,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.Saver
@@ -38,9 +44,13 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import ru.chitalka.core.designsystem.component.sparkleBurst
 import ru.chitalka.core.designsystem.cover.BookCover
 import ru.chitalka.core.designsystem.cover.CoverSize
+import ru.chitalka.core.designsystem.motion.navEnterExit
+import ru.chitalka.core.designsystem.motion.sharedBook
 import ru.chitalka.core.designsystem.theme.MotionTokens
 import ru.chitalka.core.designsystem.theme.ReaderTheme
 import kotlin.math.abs
@@ -107,6 +117,27 @@ internal fun CoverCarousel(
     val count = books.size
     val wraps = CarouselState.wraps(count)
     var dragStart by remember { mutableFloatStateOf(0f) }
+    val burst = remember { Animatable(0f) }
+    var opening by remember { mutableStateOf(false) }
+
+    // Как в видео: вокруг выбранной обложки вспыхивают искры, и только потом она улетает в карточку
+    fun open(book: CarouselBook) {
+        if (opening) return
+        opening = true
+        haptics.bookPicked()
+        scope.launch {
+            if (animate) {
+                launch {
+                    burst.snapTo(0f)
+                    burst.animateTo(1f, tween(MotionTokens.SPARKLE_MS))
+                    burst.snapTo(0f)
+                }
+                delay(MotionTokens.SPARKLE_LEAD_MS.toLong())
+            }
+            onOpen(book)
+            opening = false
+        }
+    }
 
     fun settleTo(target: Float) {
         scope.launch {
@@ -155,14 +186,21 @@ internal fun CoverCarousel(
             key(book.id) {
                 CarouselCover(book, offset, stepPx) {
                     if (distance < 0.5f) {
-                        haptics.bookPicked()
-                        onOpen(book)
+                        open(book)
                     } else {
                         settleTo(state.position + offset)
                     }
                 }
             }
         }
+        // Искры вокруг центральной обложки: слой её размера, искры разлетаются за его края
+        Box(
+            Modifier
+                .align(Alignment.TopCenter)
+                .size(150.dp, 222.dp)
+                .zIndex(20f)
+                .sparkleBurst({ burst.value }, radius = 0.75f),
+        )
     }
 }
 
@@ -171,6 +209,17 @@ private fun BoxScope.CarouselCover(book: CarouselBook, offset: Float, stepPx: Fl
     val distance = abs(offset)
     val near = min(distance, 1f)
     val interaction = remember { MutableInteractionSource() }
+    val isCentre = distance < 0.5f
+    // Соседние обложки при переходе в карточку разъезжаются в стороны, центральная улетает в карточку
+    val side = if (offset < 0f) -1 else 1
+    val travel = if (isCentre) {
+        Modifier.sharedBook(book.id)
+    } else {
+        Modifier.navEnterExit(
+            enter = slideInHorizontally(tween(MotionTokens.BOOK_FLIGHT_MS, easing = MotionTokens.Emphasized)) { side * it * 2 } + fadeIn(),
+            exit = slideOutHorizontally(tween(MotionTokens.BOOK_FLIGHT_MS, easing = MotionTokens.Emphasized)) { side * it * 2 } + fadeOut(),
+        )
+    }
     BookCover(
         title = book.title,
         author = book.author,
@@ -181,6 +230,7 @@ private fun BoxScope.CarouselCover(book: CarouselBook, offset: Float, stepPx: Fl
         modifier = Modifier
             .align(Alignment.TopCenter)
             .zIndex(10f - distance)
+            .then(if (isCentre) Modifier else travel)
             .graphicsLayer {
                 // Как в видео: соседние обложки меньше и прячутся за центральной, без поворота
                 translationX = offset * stepPx
@@ -203,6 +253,7 @@ private fun BoxScope.CarouselCover(book: CarouselBook, offset: Float, stepPx: Fl
                 ambientShadowColor = Color.Black
                 spotShadowColor = Color.Black
             }
+            .then(if (isCentre) travel else Modifier)
             .size(150.dp, 222.dp)
             .clip(RoundedCornerShape(8.dp))
             .bookSpine()

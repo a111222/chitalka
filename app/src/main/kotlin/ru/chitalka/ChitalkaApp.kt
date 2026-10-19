@@ -98,6 +98,7 @@ fun ChitalkaApp(showSplash: Boolean = false, openBookRequests: Flow<Long> = empt
             navController = navController,
             onOpenShelf = { filter -> navController.navigateToTab(LibraryRoute(filter.name), restore = false) },
             onSearch = { navController.navigateToTab(LibraryRoute()) },
+            onOpenBookmarks = { navController.navigateToTab(BookmarksRoute) },
             modifier = Modifier.glassSource(glassState),
         )
         LaunchedEffect(pendingBook) {

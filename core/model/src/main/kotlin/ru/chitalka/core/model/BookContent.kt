@@ -10,6 +10,9 @@ data class BookContent(
     val language: String?,
     val chapterCount: Int,
     val toc: List<TocEntry>,
+    /** Аннотация из файла книги или null, если её нет. */
+    val description: String? = null,
+    val genres: List<String> = emptyList(),
 )
 
 /** Пункт оглавления. level = 0 для верхнего уровня, 1 для вложенного и т. д. */

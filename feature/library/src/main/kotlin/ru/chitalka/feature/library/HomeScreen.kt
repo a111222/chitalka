@@ -4,6 +4,10 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -65,10 +69,13 @@ import ru.chitalka.core.designsystem.cover.BookCover
 import ru.chitalka.core.designsystem.cover.CoverArt
 import ru.chitalka.core.designsystem.cover.CoverSize
 import ru.chitalka.core.designsystem.icon.ChitalkaIcons
+import ru.chitalka.core.designsystem.motion.navEnterExit
 import ru.chitalka.core.designsystem.theme.MotionTokens
 import ru.chitalka.core.designsystem.theme.ReaderTheme
 import ru.chitalka.core.designsystem.typography.ChitalkaFonts
 import ru.chitalka.core.model.Book
+import ru.chitalka.feature.library.navigation.BookDetailRoute
+import ru.chitalka.feature.library.navigation.toDetailRoute
 import java.time.LocalTime
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -92,7 +99,7 @@ private val SampleCarouselBook = CarouselBook(SAMPLE_BOOK_ID, "Сад за ре�
 
 @Composable
 internal fun HomeDestination(
-    onOpenBook: (Long) -> Unit,
+    onOpenBook: (BookDetailRoute) -> Unit,
     onOpenShelf: (LibraryFilter) -> Unit,
     onSearch: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -118,7 +125,7 @@ internal fun HomeDestination(
 @Composable
 internal fun HomeScreen(
     state: LibraryUiState,
-    onOpenBook: (Long) -> Unit,
+    onOpenBook: (BookDetailRoute) -> Unit,
     onOpenShelf: (LibraryFilter) -> Unit,
     onSearch: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -152,7 +159,7 @@ internal fun HomeScreen(
                     CoverCarousel(
                         books = carouselBooks,
                         state = carousel,
-                        onOpen = { onOpenBook(it.id) },
+                        onOpen = { onOpenBook(BookDetailRoute(it.id, it.title, it.author, it.coverPath)) },
                         modifier = Modifier.riseIn(150, distance = 0.dp),
                         background = { GiantTitle(current.title) },
                     )
@@ -178,6 +185,11 @@ internal fun HomeScreen(
 
             Column(
                 Modifier
+                    // В видео при открытии книги разделы главной уезжают вниз
+                    .navEnterExit(
+                        enter = slideInVertically(tween(MotionTokens.BOOK_FLIGHT_MS, easing = MotionTokens.Emphasized)) { it / 4 } + fadeIn(),
+                        exit = slideOutVertically(tween(MotionTokens.BOOK_FLIGHT_MS, easing = MotionTokens.Emphasized)) { it / 4 } + fadeOut(),
+                    )
                     .padding(start = 18.dp, end = 18.dp, top = 6.dp)
                     .navigationBarsPadding()
                     .padding(bottom = 130.dp),
@@ -201,7 +213,7 @@ internal fun HomeScreen(
 }
 
 @Composable
-private fun HomeSectionsContent(books: List<Book>, onOpenBook: (Long) -> Unit, onOpenShelf: (LibraryFilter) -> Unit) {
+private fun HomeSectionsContent(books: List<Book>, onOpenBook: (BookDetailRoute) -> Unit, onOpenShelf: (LibraryFilter) -> Unit) {
     val shelves = remember(books) { HomeSections.shelves(books) }
     val recent = remember(books) { HomeSections.recentlyAdded(books) }
     val reading = remember(books) { HomeSections.readingNow(books) }
@@ -388,7 +400,7 @@ private fun ShelfCard(shelf: Shelf, onClick: () -> Unit, modifier: Modifier = Mo
 
 /** Ряд из четырёх обложек: «Недавно добавлены» или «Читаю сейчас» (тогда с прогрессом). */
 @Composable
-private fun BookRow(books: List<Book>, onOpenBook: (Long) -> Unit, showProgress: Boolean) {
+private fun BookRow(books: List<Book>, onOpenBook: (BookDetailRoute) -> Unit, showProgress: Boolean) {
     val colors = ReaderTheme.colors
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         for (i in 0 until HomeSections.ROW_SIZE) {
@@ -403,7 +415,7 @@ private fun BookRow(books: List<Book>, onOpenBook: (Long) -> Unit, showProgress:
                     .weight(1f)
                     .flipInOnReveal(i * MotionTokens.RISE_STAGGER_MS)
                     .pressScale(interaction)
-                    .clickable(interactionSource = interaction, indication = null, role = Role.Button) { onOpenBook(book.id) },
+                    .clickable(interactionSource = interaction, indication = null, role = Role.Button) { onOpenBook(book.toDetailRoute()) },
                 verticalArrangement = Arrangement.spacedBy(7.dp),
             ) {
                 BookCover(

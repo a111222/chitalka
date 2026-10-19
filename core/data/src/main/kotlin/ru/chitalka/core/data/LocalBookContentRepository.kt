@@ -35,6 +35,8 @@ internal class LocalBookContentRepository @Inject constructor(
             language = book.language,
             chapterCount = doc.chapterCount,
             toc = doc.toc,
+            description = doc.metadata.description,
+            genres = doc.metadata.genres,
         )
     }
 

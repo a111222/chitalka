@@ -59,6 +59,9 @@ internal class Fb2Document private constructor(
                 seriesIndex = titleInfo?.child("sequence")?.attr("number")?.toIntOrNull(),
                 language = titleInfo?.child("lang")?.text()?.cleanText(),
                 format = BookFormat.FB2,
+                description = titleInfo?.child("annotation")?.let(::paragraphsText),
+                genres = titleInfo?.children()?.filter { it.normalName() == "genre" }
+                    ?.mapNotNull { it.text().cleanText()?.let(Genres::fb2Label) }?.distinct().orEmpty(),
             )
             val coverId = titleInfo?.child("coverpage")?.child("image")?.href()
 
@@ -178,6 +181,11 @@ internal class Fb2Document private constructor(
 private fun titleText(title: Element): String? =
     title.children().mapNotNull { it.text().cleanText() }.takeIf { it.isNotEmpty() }?.joinToString("\n")
         ?: title.text().cleanText()
+
+/** Аннотация FB2 — несколько <p>; абзацы разделяем пустой строкой. */
+private fun paragraphsText(e: Element): String? =
+    e.children().mapNotNull { it.text().cleanText() }.takeIf { it.isNotEmpty() }?.joinToString("\n\n")
+        ?: e.text().cleanText()
 
 private fun Element.child(name: String): Element? = children().firstOrNull { it.normalName() == name }
 

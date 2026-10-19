@@ -32,6 +32,16 @@ object MotionTokens {
     const val RISE_MS = 600
     const val RISE_STAGGER_MS = 70
 
+    /** Искры вокруг обложки при нажатии, перед перелётом в карточку книги. */
+    const val SPARKLE_MS = 520
+    const val SPARKLE_LEAD_MS = 180
+
+    /** Обложка перелетает из карусели в карточку «О книге», затем раскрывается. */
+    const val BOOK_FLIGHT_MS = 560
+    const val BOOK_OPEN_MS = 820
+    const val BOOK_CLOSE_MS = 380
+    val BookOpen: Easing = CubicBezierEasing(0.45f, 0f, 0.15f, 1f)
+
     /** Подсветка вкладки в нижней панели. */
     const val NAV_MS = 300
 

@@ -68,6 +68,8 @@ import ru.chitalka.core.designsystem.cover.CoverSize
 import ru.chitalka.core.designsystem.icon.ChitalkaIcons
 import ru.chitalka.core.designsystem.theme.ReaderTheme
 import ru.chitalka.core.model.Book
+import ru.chitalka.feature.library.navigation.BookDetailRoute
+import ru.chitalka.feature.library.navigation.toDetailRoute
 import kotlin.math.roundToInt
 
 /** Сколько первых обложек сетки появляются волной; остальные — сразу, чтобы прокрутка не дёргалась. */
@@ -76,7 +78,7 @@ private const val STAGGERED_ITEMS = 12
 @Composable
 internal fun LibraryDestination(
     initialFilter: LibraryFilter?,
-    onOpenBook: (Long) -> Unit,
+    onOpenBook: (BookDetailRoute) -> Unit,
     viewModel: LibraryViewModel = hiltViewModel(),
 ) {
     LaunchedEffect(viewModel) { viewModel.applyInitialFilter(initialFilter) }
@@ -91,7 +93,7 @@ internal fun LibraryDestination(
 internal fun LibraryScreen(
     state: LibraryUiState,
     onEvent: (LibraryEvent) -> Unit,
-    onOpenBook: (Long) -> Unit,
+    onOpenBook: (BookDetailRoute) -> Unit,
     onAddBooks: () -> Unit,
 ) {
     val colors = ReaderTheme.colors
@@ -161,7 +163,7 @@ internal fun LibraryScreen(
                     book = book,
                     onClick = {
                         haptics.bookPicked()
-                        onOpenBook(book.id)
+                        onOpenBook(book.toDetailRoute())
                     },
                     onLongClick = {
                         haptics.confirm()

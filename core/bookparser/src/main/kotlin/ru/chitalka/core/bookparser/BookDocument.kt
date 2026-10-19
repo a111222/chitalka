@@ -31,6 +31,10 @@ data class BookMetadata(
     val seriesIndex: Int? = null,
     val language: String? = null,
     val format: BookFormat,
+    /** Аннотация для карточки «О книге»: абзацы через пустую строку. */
+    val description: String? = null,
+    /** Жанры по-русски: «Классика», «Фантастика». */
+    val genres: List<String> = emptyList(),
 )
 
 /** Книгу не удалось прочитать: файл повреждён или это не тот формат. */
