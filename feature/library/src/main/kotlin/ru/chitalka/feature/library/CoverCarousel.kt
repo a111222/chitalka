@@ -26,6 +26,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
@@ -84,8 +88,7 @@ internal class CarouselState(initial: Float) {
 internal fun rememberCarouselState(): CarouselState = rememberSaveable(saver = CarouselState.Saver) { CarouselState(0f) }
 
 /**
- * 3D-карусель обложек из видео: центральная крупно и прямо, соседние меньше, ниже
- * и развёрнуты к центру (rotateY ±28°). Свайп листает, тап по соседней подвозит её в центр,
+ * Карусель обложек из видео: центральная крупно, соседние меньше и прячутся за ней. Свайп листает, тап по соседней подвозит её в центр,
  * тап по центральной открывает книгу.
  */
 @Composable
@@ -179,21 +182,20 @@ private fun BoxScope.CarouselCover(book: CarouselBook, offset: Float, stepPx: Fl
             .align(Alignment.TopCenter)
             .zIndex(10f - distance)
             .graphicsLayer {
+                // Как в видео: соседние обложки меньше и прячутся за центральной, без поворота
                 translationX = offset * stepPx
-                translationY = near * 22.dp.toPx()
+                translationY = near * 12.dp.toPx()
                 val scale = when {
-                    distance <= 1f -> 1f - 0.24f * distance
-                    distance <= 2f -> 0.76f - 0.18f * (distance - 1f)
-                    else -> 0.58f
+                    distance <= 1f -> 1f - 0.16f * distance
+                    distance <= 2f -> 0.84f - 0.14f * (distance - 1f)
+                    else -> 0.7f
                 }
                 scaleX = scale
                 scaleY = scale
-                rotationY = -28f * offset.coerceIn(-1f, 1f)
-                cameraDistance = 12f * density
                 alpha = when {
                     distance <= 1f -> 1f
-                    distance <= 2f -> 1f - 0.45f * (distance - 1f)
-                    else -> (0.55f * (2.6f - distance) / 0.6f).coerceAtLeast(0f)
+                    distance <= 2f -> 1f - 0.3f * (distance - 1f)
+                    else -> (0.7f * (2.6f - distance) / 0.6f).coerceAtLeast(0f)
                 }
                 shadowElevation = (26f - 14f * near) * density
                 shape = RoundedCornerShape(8.dp)
@@ -203,7 +205,24 @@ private fun BoxScope.CarouselCover(book: CarouselBook, offset: Float, stepPx: Fl
             }
             .size(150.dp, 222.dp)
             .clip(RoundedCornerShape(8.dp))
+            .bookSpine()
             .semantics { contentDescription = if (distance < 0.5f) "Открыть «${book.title}»" else "Показать «${book.title}»" }
             .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onTap),
     )
+}
+
+/** Корешок твёрдой обложки: светлая полоска и тень у левого края, чтобы обложка выглядела книгой. */
+internal fun Modifier.bookSpine(): Modifier = drawWithContent {
+    drawContent()
+    val spine = 7.dp.toPx()
+    drawRect(
+        Brush.horizontalGradient(
+            0f to Color.White.copy(alpha = 0.28f),
+            0.6f to Color.White.copy(alpha = 0.08f),
+            1f to Color.Black.copy(alpha = 0.3f),
+            endX = spine,
+        ),
+        size = Size(spine, size.height),
+    )
+    drawRect(Color.Black.copy(alpha = 0.18f), topLeft = Offset(spine, 0f), size = Size(1.dp.toPx(), size.height))
 }

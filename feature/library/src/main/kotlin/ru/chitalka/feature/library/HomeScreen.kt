@@ -1,6 +1,5 @@
 package ru.chitalka.feature.library
 
-import android.os.Build
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -45,7 +44,6 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
@@ -60,6 +58,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.chitalka.core.designsystem.component.GradientIconButton
 import ru.chitalka.core.designsystem.component.GradientProgress
 import ru.chitalka.core.designsystem.component.HeaderIconButton
+import ru.chitalka.core.designsystem.component.flipInOnReveal
 import ru.chitalka.core.designsystem.component.pressScale
 import ru.chitalka.core.designsystem.component.riseIn
 import ru.chitalka.core.designsystem.cover.BookCover
@@ -73,6 +72,7 @@ import ru.chitalka.core.model.Book
 import java.time.LocalTime
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlin.math.sign
 
 /** id демонстрационной книги «Сад за рекой»: её можно открыть, пока библиотека пуста. */
 const val SAMPLE_BOOK_ID = 0L
@@ -247,7 +247,8 @@ private fun greeting(): String = when (LocalTime.now().hour) {
 }
 
 /**
- * Приглушённый фон за каруселью: увеличенная и сильно размытая текущая обложка.
+ * Приглушённый фон за каруселью, как в видео: та же обложка, сильно увеличенная и затемнённая,
+ * чуть размытая (на Android 12+; на старых телефонах просто затемнённая — рисунок всё равно виден).
  * При перелистывании фон плавно перетекает в обложку новой книги.
  */
 @Composable
@@ -255,49 +256,31 @@ private fun HeroBackdrop(book: CarouselBook, modifier: Modifier = Modifier) {
     val colors = ReaderTheme.colors
     Box(modifier.clipToBounds()) {
         Crossfade(book, animationSpec = tween(MotionTokens.BACKDROP_MS), label = "backdrop", modifier = Modifier.fillMaxSize()) { shown ->
-            val art = remember(shown) { shown.art ?: CoverArt.forBook(shown.title, shown.author) }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                BookCover(
-                    title = shown.title,
-                    author = shown.author,
-                    coverPath = shown.coverPath,
-                    size = CoverSize.Bare,
-                    artOverride = art,
-                    shape = RoundedCornerShape(0.dp),
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            scaleX = 1.35f
-                            scaleY = 1.35f
-                            alpha = 0.55f
-                        }
-                        .blur(42.dp, BlurredEdgeTreatment.Unbounded),
-                )
-            } else {
-                // Android 8–11 не умеет размывать слой: рисуем мягкое пятно главного цвета обложки
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .drawBehind {
-                            drawRect(
-                                Brush.radialGradient(
-                                    listOf(art.glow.copy(alpha = 0.55f), art.glow.copy(alpha = 0.18f), Color.Transparent),
-                                    center = center.copy(y = size.height * 0.4f),
-                                    radius = size.maxDimension * 0.75f,
-                                ),
-                            )
-                        },
-                )
-            }
+            BookCover(
+                title = shown.title,
+                author = shown.author,
+                coverPath = shown.coverPath,
+                size = CoverSize.Bare,
+                artOverride = shown.art,
+                shape = RoundedCornerShape(0.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        scaleX = 2.2f
+                        scaleY = 2.2f
+                    }
+                    .blur(5.dp, BlurredEdgeTreatment.Unbounded),
+            )
         }
-        // Затемнение: сверху чуть-чуть, книзу фон полностью уходит в цвет экрана
+        // Затемнение до ~35% яркости, книзу фон полностью уходит в цвет экрана
         Box(
             Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        0f to colors.background.copy(alpha = 0.35f),
-                        0.55f to colors.background.copy(alpha = 0.2f),
+                        0f to colors.background.copy(alpha = 0.72f),
+                        0.3f to colors.background.copy(alpha = 0.6f),
+                        0.75f to colors.background.copy(alpha = 0.7f),
                         1f to colors.background,
                     ),
                 ),
@@ -305,7 +288,7 @@ private fun HeroBackdrop(book: CarouselBook, modifier: Modifier = Modifier) {
     }
 }
 
-/** Огромное бледное название за каруселью (Playfair 66 sp, 13% белого). */
+/** Огромное название за каруселью: тёмное, полупрозрачное, наполовину скрыто обложкой (Playfair 66 sp). */
 @Composable
 private fun GiantTitle(title: String) {
     Crossfade(title, animationSpec = tween(400), label = "giantTitle", modifier = Modifier.fillMaxWidth()) { text ->
@@ -313,11 +296,11 @@ private fun GiantTitle(title: String) {
             Text(
                 text,
                 style = TextStyle(fontFamily = ChitalkaFonts.Playfair, fontWeight = FontWeight.SemiBold, fontSize = 66.sp),
-                color = Color.White.copy(alpha = 0.13f),
+                color = Color.Black.copy(alpha = 0.42f),
                 maxLines = 1,
                 softWrap = false,
                 modifier = Modifier
-                    .offset(y = 150.dp)
+                    .offset(y = 140.dp)
                     .wrapContentSize(unbounded = true)
                     .blur(1.5.dp, BlurredEdgeTreatment.Unbounded),
             )
@@ -418,6 +401,7 @@ private fun BookRow(books: List<Book>, onOpenBook: (Long) -> Unit, showProgress:
             Column(
                 Modifier
                     .weight(1f)
+                    .flipInOnReveal(i * MotionTokens.RISE_STAGGER_MS)
                     .pressScale(interaction)
                     .clickable(interactionSource = interaction, indication = null, role = Role.Button) { onOpenBook(book.id) },
                 verticalArrangement = Arrangement.spacedBy(7.dp),
@@ -462,80 +446,67 @@ private fun BookRow(books: List<Book>, onOpenBook: (Long) -> Unit, showProgress:
     }
 }
 
-private val AuthorPalette = listOf(Color(0xFF4B3B8F), Color(0xFFB5486A), Color(0xFF1F8A7A), Color(0xFF6A4BC4))
-
-/** «Авторы на полке»: блоки с монограммами, самый читаемый автор — в центре и выше всех. */
+/**
+ * «Авторы на полке», как в видео: книги самых читаемых авторов стоят веером в перспективе.
+ * Книга самого частого автора — в центре, лицом к нам, остальные развёрнуты к краям.
+ */
 @Composable
 private fun AuthorsCard(authors: List<AuthorOnShelf>, modifier: Modifier = Modifier) {
     val colors = ReaderTheme.colors
     val order = remember(authors.size) { HomeSections.pyramidOrder(authors.size) }
     val centre = order.indexOf(0)
-    Box(
+    Column(
         modifier
             .fillMaxWidth()
-            .height(168.dp)
             .clip(RoundedCornerShape(18.dp))
-            .background(colors.surface),
+            .background(colors.surface)
+            .padding(top = 18.dp, bottom = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            "Авторы на полке",
-            style = MaterialTheme.typography.titleMedium,
-            color = colors.ink,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 18.dp),
-        )
-        // Блоки заходят друг на друга на 8 dp: сдвигаем ряд, чтобы он остался по центру
-        Row(
-            Modifier
-                .align(Alignment.BottomCenter)
-                .offset(x = (4 * (order.size - 1)).dp),
-            verticalAlignment = Alignment.Bottom,
-        ) {
+        Text("Авторы на полке", style = MaterialTheme.typography.titleMedium, color = colors.ink)
+        Spacer(Modifier.height(14.dp))
+        Box(Modifier.fillMaxWidth().height(124.dp), contentAlignment = Alignment.BottomCenter) {
             order.forEachIndexed { position, rank ->
                 val author = authors[rank]
-                val height = when (abs(position - centre)) {
-                    0 -> 118.dp
-                    1 -> 104.dp
-                    else -> 92.dp
-                }
-                val isTop = rank == 0
-                val shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
-                Column(
-                    Modifier
-                        .zIndex(if (isTop) 5f else 3f - abs(position - centre))
-                        .offset(x = if (position == 0) 0.dp else (-8 * position).dp)
-                        .width(58.dp)
-                        .height(height)
-                        .shadow(18.dp, shape, ambientColor = Color.Black, spotColor = Color.Black)
-                        .clip(shape)
-                        .background(
-                            if (isTop) {
-                                Brush.verticalGradient(listOf(Color(0xFFF4F1EA), Color(0xFFCFCBDF)))
-                            } else {
-                                SolidColor(AuthorPalette[(rank - 1) % AuthorPalette.size])
-                            },
-                        )
-                        .padding(bottom = 10.dp, start = 2.dp, end = 2.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Bottom,
-                ) {
-                    val ink = if (isTop) Color(0xFF2A2340) else Color.White
-                    Text(
-                        author.monogram.toString(),
-                        style = TextStyle(fontFamily = ChitalkaFonts.Playfair, fontWeight = FontWeight.Bold, fontSize = 22.sp),
-                        color = ink,
-                    )
-                    Text(
-                        author.name,
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                        color = ink.copy(alpha = 0.85f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                val side = position - centre
+                val step = abs(side)
+                val width = when (step) { 0 -> 78.dp; 1 -> 66.dp; else -> 58.dp }
+                val height = when (step) { 0 -> 116.dp; 1 -> 100.dp; else -> 88.dp }
+                BookCover(
+                    title = author.cover.title,
+                    author = author.cover.author,
+                    coverPath = author.cover.coverPath,
+                    size = CoverSize.Tiny,
+                    shape = RoundedCornerShape(3.dp),
+                    modifier = Modifier
+                        .zIndex(10f - step)
+                        .graphicsLayer {
+                            translationX = sign(side.toFloat()) * when (step) {
+                                0 -> 0f
+                                1 -> 62.dp.toPx()
+                                else -> 112.dp.toPx()
+                            }
+                            rotationY = -side * (if (step == 1) 38f else 30f)
+                            cameraDistance = 8f * density
+                            shadowElevation = 14.dp.toPx()
+                            shape = RoundedCornerShape(3.dp)
+                            ambientShadowColor = Color.Black
+                            spotShadowColor = Color.Black
+                        }
+                        .size(width, height)
+                        .bookSpine(),
+                )
             }
         }
+        Spacer(Modifier.height(12.dp))
+        Text(
+            order.joinToString(" · ") { authors[it].name },
+            style = MaterialTheme.typography.labelMedium,
+            color = colors.inkSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 20.dp),
+        )
     }
 }
 

@@ -33,6 +33,8 @@ class HomeSectionsTest {
         assertEquals(listOf("Толстой", "Гоголь", "Чехов"), authors.map { it.name })
         assertEquals(2, authors.first().books)
         assertEquals('Т', authors.first().monogram)
+        // Для веера берём последнюю добавленную книгу автора
+        assertEquals(2L, authors.first().cover.id)
     }
 
     @Test

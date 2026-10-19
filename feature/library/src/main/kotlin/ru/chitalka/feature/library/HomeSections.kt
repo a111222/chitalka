@@ -30,16 +30,17 @@ internal object HomeSections {
     fun readingNow(books: List<Book>): List<Book> =
         books.filter { it.readingState == ReadingState.Reading }.take(ROW_SIZE)
 
-    /** Авторы, у которых больше всего книг на полке; самый частый — первым. */
+    /** Авторы, у которых больше всего книг на полке; самый частый — первым. У каждого — его последняя книга для обложки. */
     fun authors(books: List<Book>): List<AuthorOnShelf> =
-        books.mapNotNull { book -> book.author?.let(::surnameOf) }
-            .filter { it.isNotBlank() }
-            .groupingBy { it }
-            .eachCount()
+        books.filter { !it.author.isNullOrBlank() }
+            .groupBy { surnameOf(it.author!!) }
+            .filterKeys { it.isNotBlank() }
             .entries
-            .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
+            .sortedWith(compareByDescending<Map.Entry<String, List<Book>>> { it.value.size }.thenBy { it.key })
             .take(AUTHORS_SIZE)
-            .map { AuthorOnShelf(name = it.key, monogram = it.key.first().uppercaseChar(), books = it.value) }
+            .map { (name, own) ->
+                AuthorOnShelf(name = name, monogram = name.first().uppercaseChar(), books = own.size, cover = own.maxBy { it.addedAt })
+            }
 
     /**
      * Фамилия для подписи: «Лев Толстой» → «Толстой», «Толстой Лев Николаевич» → «Толстой»
@@ -78,4 +79,4 @@ internal object HomeSections {
 
 internal data class Shelf(val filter: LibraryFilter, val name: String, val count: Int, val fan: List<Book>)
 
-internal data class AuthorOnShelf(val name: String, val monogram: Char, val books: Int)
+internal data class AuthorOnShelf(val name: String, val monogram: Char, val books: Int, val cover: Book)

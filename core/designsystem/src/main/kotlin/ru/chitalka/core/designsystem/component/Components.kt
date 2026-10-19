@@ -23,6 +23,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,6 +39,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.findRootCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -58,6 +63,35 @@ fun Modifier.riseIn(delayMillis: Int = 0, distance: Dp = 26.dp): Modifier = comp
         alpha = p
         translationY = (1f - p) * distance.toPx()
     }
+}
+
+/**
+ * Обложки в рядах главной, как в видео: когда ряд доезжает до экрана при прокрутке,
+ * обложки по очереди разворачиваются к нам из профиля (поворот вокруг вертикальной оси).
+ */
+fun Modifier.flipInOnReveal(delayMillis: Int = 0): Modifier = composed {
+    val enabled = ReaderTheme.animationsEnabled
+    val progress = remember { Animatable(if (enabled) 0f else 1f) }
+    var revealed by remember { mutableStateOf(!enabled) }
+    LaunchedEffect(revealed) {
+        if (revealed && progress.value < 1f) {
+            progress.animateTo(1f, tween(MotionTokens.RISE_MS, delayMillis, MotionTokens.Emphasized))
+        }
+    }
+    this
+        .onGloballyPositioned { coordinates ->
+            if (!revealed) {
+                val top = coordinates.positionInRoot().y
+                val screen = coordinates.findRootCoordinates().size.height
+                if (top < screen * 0.92f) revealed = true
+            }
+        }
+        .graphicsLayer {
+            val p = progress.value
+            rotationY = 75f * (1f - p)
+            alpha = (p * 1.6f).coerceAtMost(1f)
+            cameraDistance = 10f * density
+        }
 }
 
 /** Лёгкое «вдавливание» при нажатии, как .ch-btn:active в макете. */
