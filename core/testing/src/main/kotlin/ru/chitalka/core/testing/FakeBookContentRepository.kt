@@ -9,6 +9,8 @@ import ru.chitalka.core.model.Chapter
 class FakeBookContentRepository(
     private val chapterCount: Int = 3,
     private val title: String = "Тестовая книга",
+    private val description: String? = null,
+    private val genres: List<String> = emptyList(),
 ) : BookContentRepository {
     val requestedChapters = mutableListOf<Int>()
 
@@ -18,6 +20,8 @@ class FakeBookContentRepository(
         language = "ru",
         chapterCount = chapterCount,
         toc = emptyList(),
+        description = description,
+        genres = genres,
     )
 
     override suspend fun chapter(bookId: Long, index: Int): Chapter {

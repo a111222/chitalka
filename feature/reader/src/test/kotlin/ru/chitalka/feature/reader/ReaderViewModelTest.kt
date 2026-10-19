@@ -10,7 +10,9 @@ import org.junit.Rule
 import org.junit.Test
 import ru.chitalka.core.model.Book
 import ru.chitalka.core.model.BookFormat
+import ru.chitalka.core.model.LineSpacing
 import ru.chitalka.core.model.ReaderFont
+import ru.chitalka.core.model.ReaderThemeMode
 import ru.chitalka.core.model.ReaderSettings
 import ru.chitalka.core.model.ReadingPosition
 import ru.chitalka.core.testing.FakeBookContentRepository
@@ -66,7 +68,20 @@ class ReaderViewModelTest {
             expectNoEvents()
             assertEquals(ReadingPosition(1, 0), vm.uiState.value.position)
         }
-        assertEquals(listOf(0, 1), content.requestedChapters)
+        // Каждая глава грузится один раз: соседние берутся про запас и потом не перечитываются
+        assertEquals(listOf(0, 1, 2), content.requestedChapters)
+    }
+
+    @Test
+    fun neighbourChaptersArePreloadedForPageCurl() = runTest {
+        val vm = viewModel(7)
+        vm.uiState.test {
+            awaitLoaded()
+            assertEquals(listOf(0, 1), vm.uiState.value.nearby.map { it.chapter.index })
+            vm.onEvent(ReaderEvent.GoTo(ReadingPosition(1, 0)))
+            assertEquals(listOf(1, 2, 0), vm.uiState.value.nearby.map { it.chapter.index })
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     @Test
@@ -86,6 +101,23 @@ class ReaderViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
         assertNull(books.positionOf(SAMPLE_BOOK_ID))
+    }
+
+    @Test
+    fun sheetChangesSettingsAndKeepsSizeInRange() = runTest {
+        val vm = viewModel(7)
+        vm.uiState.test {
+            awaitLoaded()
+            vm.onEvent(ReaderEvent.ChangeFont(ReaderFont.PtSerif))
+            vm.onEvent(ReaderEvent.ChangeFontSize(99))
+            vm.onEvent(ReaderEvent.ChangeSpacing(LineSpacing.Relaxed))
+            vm.onEvent(ReaderEvent.ChangeTheme(ReaderThemeMode.Warm))
+            val settings = expectMostRecentItem().settings
+            assertEquals(ReaderFont.PtSerif, settings.font)
+            assertEquals(ReaderSettings.MAX_FONT_SIZE, settings.fontSizeSp)
+            assertEquals(LineSpacing.Relaxed, settings.lineSpacing)
+            assertEquals(ReaderThemeMode.Warm, settings.theme)
+        }
     }
 
     private suspend fun ReceiveTurbine<ReaderUiState>.awaitLoaded(): ReaderUiState {

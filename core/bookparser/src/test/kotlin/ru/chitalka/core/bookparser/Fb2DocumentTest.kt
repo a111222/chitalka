@@ -20,6 +20,9 @@ class Fb2DocumentTest {
               <author><first-name>Лев</first-name><last-name>Толстой</last-name></author>
               <book-title>Война и мир</book-title>
               <lang>ru</lang>
+              <genre>prose_rus_classic</genre>
+              <genre>sf_unknown_code</genre>
+              <annotation><p>Роман-эпопея.</p><p>О войне   и мире.</p></annotation>
               <sequence name="Эпопея" number="1"/>
               <coverpage><image l:href="#cover.jpg"/></coverpage>
             </title-info>
@@ -57,6 +60,8 @@ class Fb2DocumentTest {
         assertEquals("Эпопея", meta.series)
         assertEquals(1, meta.seriesIndex)
         assertEquals("ru", meta.language)
+        assertEquals("Роман-эпопея.\n\nО войне и мире.", meta.description)
+        assertEquals(listOf("Русская классика", "Фантастика"), meta.genres)
     }
 
     @Test

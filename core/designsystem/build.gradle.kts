@@ -11,4 +11,8 @@ dependencies {
     api(libs.androidx.compose.foundation)
     api(libs.androidx.compose.material3)
     api(libs.androidx.compose.ui)
+    // Обложки из файлов книг
+    implementation(libs.coil.compose)
+    // Матовое стекло: размытие того, что под панелью (на Android 8–11 через RenderScript)
+    api(libs.haze)
 }

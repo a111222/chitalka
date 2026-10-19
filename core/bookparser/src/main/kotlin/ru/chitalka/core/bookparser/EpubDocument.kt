@@ -97,7 +97,18 @@ internal class EpubDocument private constructor(
                 seriesIndex = meta("calibre:series_index")?.toDoubleOrNull()?.toInt(),
                 language = dc("language"),
                 format = BookFormat.EPUB,
+                description = opf.select("metadata > *").firstOrNull { it.tagName().endsWith("description") }
+                    ?.text()?.let { htmlParagraphs(it) },
+                genres = opf.select("metadata > *").filter { it.tagName().endsWith("subject") }
+                    .mapNotNull { it.text().cleanText() }.distinct(),
             )
+        }
+
+        /** dc:description часто содержит экранированный HTML: «&lt;p&gt;…&lt;/p&gt;». */
+        private fun htmlParagraphs(raw: String): String? {
+            val body = Jsoup.parseBodyFragment(raw).body()
+            val paragraphs = body.select("p").mapNotNull { it.text().cleanText() }
+            return paragraphs.takeIf { it.isNotEmpty() }?.joinToString("\n\n") ?: body.text().cleanText()
         }
 
         private fun findCover(opf: Document, manifest: Map<String, ManifestItem>): String? {

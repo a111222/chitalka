@@ -1,24 +1,23 @@
 package ru.chitalka.feature.reader
 
 import android.graphics.BitmapFactory
-import androidx.compose.animation.AnimatedContent
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,13 +29,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -44,18 +38,25 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
@@ -68,7 +69,7 @@ import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.min
@@ -76,17 +77,21 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import ru.chitalka.core.designsystem.adaptive.LocalWindowWidth
 import ru.chitalka.core.designsystem.adaptive.ReadingColumnMaxWidth
 import ru.chitalka.core.designsystem.adaptive.WindowWidth
+import ru.chitalka.core.designsystem.component.glassSource
+import ru.chitalka.core.designsystem.component.rememberGlassState
+import ru.chitalka.core.designsystem.component.riseIn
 import ru.chitalka.core.designsystem.theme.MotionTokens
 import ru.chitalka.core.designsystem.theme.ReaderTheme
+import ru.chitalka.core.designsystem.typography.ChitalkaFonts
 import ru.chitalka.core.designsystem.typography.ReaderFonts
 import ru.chitalka.core.model.ReaderSettings
 import ru.chitalka.core.model.ReadingPosition
 import ru.chitalka.core.model.TocEntry
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
 @Composable
@@ -98,19 +103,20 @@ internal fun ReaderRoute(
     ReaderScreen(state = state, onEvent = viewModel::onEvent, onBack = onBack)
 }
 
-private val PagePaddingH = 24.dp
+private val PagePaddingH = 26.dp
 private val PagePaddingV = 8.dp
 private val SpreadPadding = 32.dp
 private val SpreadGap = 48.dp
-
-/** Что видно сейчас: глава, разрезанная на страницы, и первая видимая страница. */
-private data class Spread(val paged: PagedChapter, val first: Int)
+private val SpineShadow = 28.dp
 
 /**
- * Экран чтения. Тап по правой трети или свайп влево — вперёд, левая треть или свайп вправо — назад.
- * На планшете вместо одной страницы — разворот из двух. Страницы считаются здесь, а не во ViewModel:
+ * Читалка из видео: тёмная страница, сверху «назад», оглавление и «Аа», снизу кольцо прогресса
+ * и номер страницы. Листание как в Apple Books: лист берут за уголок, он изгибается за пальцем
+ * и переворачивается, показывая оборот (см. [PageTurner], [Fold]). Тап по правой трети — вперёд,
+ * по левой — назад: лист сам переворачивается от нижнего уголка.
+ * «Аа» открывает шторку из матового стекла: шрифт, размер, интервал, оттенок страницы.
+ * На планшете — раскрытая книга из двух страниц: переворачивается правый лист, на его обороте следующая левая. Страницы считаются здесь, а не во ViewModel:
  * их число зависит от шрифта, кегля и размера экрана.
- * 3D-листание с изгибом листа (PageCurl на AGSL) придёт на этапе «Премиум-эффекты».
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -126,153 +132,200 @@ fun ReaderScreen(
     // В развороте листаем сразу по две страницы
     val step = if (isSpread) 2 else 1
     var showToc by remember { mutableStateOf(false) }
-    var footer by remember { mutableStateOf("") }
+    var sheetOpen by remember { mutableStateOf(false) }
+    var pageLabel by remember { mutableStateOf("") }
+    var bookPercent by remember { mutableFloatStateOf(0f) }
+    val glassState = rememberGlassState()
+    val scope = rememberCoroutineScope()
+    val turner = remember { PageTurner(scope) }
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(colors.paper)
-            .safeDrawingPadding(),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 4.dp)) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад к шкафу", tint = colors.inkSecondary)
-            }
-            Text(
-                state.title,
-                style = MaterialTheme.typography.titleMedium,
-                color = colors.inkSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            IconButton(onClick = { showToc = true }, enabled = state.chapterCount > 0) {
-                Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Оглавление", tint = colors.inkSecondary)
-            }
-        }
+    BackHandler(enabled = sheetOpen) { sheetOpen = false }
 
-        BoxWithConstraints(
+    Box(Modifier.fillMaxSize().background(colors.paper)) {
+        Column(
             Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-            contentAlignment = Alignment.TopCenter,
+                .fillMaxSize()
+                .glassSource(glassState)
+                .background(colors.paper)
+                .safeDrawingPadding(),
         ) {
-            val pageWidth = if (isSpread) {
-                (maxWidth - SpreadPadding * 2 - SpreadGap) / 2
-            } else {
-                min(maxWidth, ReadingColumnMaxWidth)
-            }
-            val density = LocalDensity.current
-            val textWidthPx = with(density) { (pageWidth - PagePaddingH * 2).roundToPx() }
-            val textHeightPx = with(density) { (maxHeight - PagePaddingV * 2).roundToPx() }
-            val paged = rememberPagedChapter(state.chapter, state.settings, state.language, textWidthPx, textHeightPx)
+            ReaderTopBar(
+                onBack = onBack,
+                onContents = { showToc = true },
+                contentsEnabled = state.chapterCount > 0,
+                onAppearance = { sheetOpen = true },
+            )
 
-            // Страницы готовы, только если разрезана именно та глава, где стоит читатель
-            val visible = paged?.takeIf { it.chapterIndex == state.position.chapterIndex }?.let {
-                val page = it.pageFor(state.position.charOffset)
-                Spread(it, if (isSpread) page - page % 2 else page)
-            }
-            // Пока грузится соседняя глава, держим на экране последнюю показанную страницу
-            val lastShown = remember { mutableStateOf<Spread?>(null) }
-            val shown = visible ?: lastShown.value
-            SideEffect { if (visible != null) lastShown.value = visible }
+            BoxWithConstraints(
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                val halfWidth = maxWidth / 2
+                val pageWidth = if (isSpread) {
+                    halfWidth - SpreadPadding - SpreadGap / 2
+                } else {
+                    min(maxWidth, ReadingColumnMaxWidth)
+                }
+                val screenDensity = LocalDensity.current
+                val widthPx = constraints.maxWidth.toFloat()
+                val heightPx = constraints.maxHeight.toFloat()
+                val textWidthPx = with(screenDensity) { (pageWidth - PagePaddingH * 2).roundToPx() }
+                val textHeightPx = with(screenDensity) { (maxHeight - PagePaddingV * 2).roundToPx() }
+                val chapters = state.nearby.ifEmpty { listOfNotNull(state.chapter) }
+                val loadedByIndex = remember(chapters) { chapters.associateBy { it.chapter.index } }
+                val pagedMap = rememberPagedChapters(
+                    chapters, state.position.chapterIndex, state.settings, state.language, textWidthPx, textHeightPx,
+                )
 
-            LaunchedEffect(visible) {
-                val spread = visible ?: return@LaunchedEffect
-                val pages = spread.paged.pages
-                val chapterProgress = (spread.first + step).coerceAtMost(pages.size).toFloat() / pages.size
-                val percent = (spread.paged.chapterIndex + chapterProgress) / state.chapterCount.coerceAtLeast(1)
-                footer = "Глава ${spread.paged.chapterIndex + 1} из ${state.chapterCount}  ·  ${(percent * 100).roundToInt()}%"
-                onEvent(ReaderEvent.PageShown(ReadingPosition(spread.paged.chapterIndex, pages[spread.first].startOffset), percent))
-            }
+                // Страницы готовы, только если разрезана именно та глава, где стоит читатель
+                val visible = pagedMap[state.position.chapterIndex]?.let {
+                    val page = it.pageFor(state.position.charOffset)
+                    Spread(it, if (isSpread) page - page % 2 else page)
+                }
+                // Пока грузится соседняя глава, держим на экране последнюю показанную страницу
+                val lastShown = remember { mutableStateOf<Spread?>(null) }
+                val shown = visible ?: lastShown.value
+                SideEffect {
+                    if (visible != null) lastShown.value = visible
+                    turner.visible = visible
+                    turner.area = Size(widthPx, heightPx)
+                    turner.spineX = if (isSpread) widthPx / 2 else 0f
+                    turner.pageWidth = if (isSpread) widthPx / 2 else widthPx
+                    turner.animate = animate
+                    turner.onEvent = onEvent
+                    turner.onTurned = haptics::pageTurn
+                    turner.neighbourOf = { spread, forward -> neighbourSpread(spread, forward, step, pagedMap) }
+                    turner.fallbackTarget = { spread, forward -> targetPosition(spread, forward, step, state.chapterCount) }
+                }
 
-            val turn by rememberUpdatedState { forward: Boolean ->
-                val spread = visible
-                if (spread != null) {
-                    val target = targetPosition(spread, forward, step, state.chapterCount)
-                    if (target != null) {
-                        haptics.pageTurn()
-                        onEvent(ReaderEvent.GoTo(target))
+                LaunchedEffect(visible) {
+                    val spread = visible ?: return@LaunchedEffect
+                    val pages = spread.paged.pages
+                    val chapterProgress = (spread.first + step).coerceAtMost(pages.size).toFloat() / pages.size
+                    val percent = (spread.paged.chapterIndex + chapterProgress) / state.chapterCount.coerceAtLeast(1)
+                    val lastPage = (spread.first + step).coerceAtMost(pages.size)
+                    pageLabel = "Глава ${spread.paged.chapterIndex + 1}  ·  стр. $lastPage из ${pages.size}"
+                    bookPercent = percent
+                    onEvent(ReaderEvent.PageShown(ReadingPosition(spread.paged.chapterIndex, pages[spread.first].startOffset), percent))
+                }
+                LaunchedEffect(visible, turner.turn) {
+                    turner.onShown(visible)
+                    if (turner.turn?.committed == true) {
+                        delay(MotionTokens.PAGE_SETTLE_MS.toLong())
+                        turner.forceSettle()
+                    }
+                }
+
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .riseIn(80)
+                        .pointerInput(Unit) {
+                            detectTapGestures { offset ->
+                                when {
+                                    offset.x > size.width * 2 / 3 -> turner.tap(true)
+                                    offset.x < size.width / 3 -> turner.tap(false)
+                                }
+                            }
+                        }
+                        .pointerInput(Unit) {
+                            val velocity = VelocityTracker()
+                            detectDragGestures(
+                                onDragStart = { at ->
+                                    velocity.resetTracking()
+                                    turner.dragStart(at)
+                                },
+                                onDrag = { change, _ ->
+                                    velocity.addPosition(change.uptimeMillis, change.position)
+                                    turner.drag(change.position)
+                                },
+                                onDragEnd = { turner.dragEnd(velocity.calculateVelocity().x) },
+                                onDragCancel = { turner.dragEnd(0f) },
+                            )
+                        },
+                    contentAlignment = Alignment.TopCenter,
+                ) {
+                    val turn = turner.turn
+                    val backPaper = colors.paper.copy(alpha = 0.88f)
+                    when {
+                        state.error != null -> Message(state.error)
+                        shown == null -> CircularProgressIndicator(Modifier.align(Alignment.Center), color = colors.accent)
+                        isSpread && turn != null -> {
+                            // Слева лежит левая страница прежнего разворота, справа под листом — правая следующего.
+                            // Сам лист: лицо — правая страница прежнего, оборот — левая следующего.
+                            PageHalf(turn.from, 0, loadedByIndex, left = true, halfWidth, bookPercent, Modifier.align(Alignment.TopStart))
+                            PageHalf(turn.to, 1, loadedByIndex, left = false, halfWidth, bookPercent, Modifier.align(Alignment.TopEnd))
+                            PageHalf(
+                                turn.from, 1, loadedByIndex, left = false, halfWidth, bookPercent,
+                                Modifier
+                                    .align(Alignment.TopEnd)
+                                    .pageCurl({ turner.fold() }, Offset(widthPx / 2, 0f), CurlPart.FrontOnly, backPaper),
+                            )
+                            PageHalf(
+                                turn.to, 0, loadedByIndex, left = true, halfWidth, bookPercent,
+                                Modifier
+                                    .align(Alignment.TopStart)
+                                    .pageCurl({ turner.fold() }, Offset.Zero, CurlPart.BackOnly, backPaper),
+                            )
+                        }
+                        isSpread -> {
+                            PageHalf(shown, 0, loadedByIndex, left = true, halfWidth, bookPercent, Modifier.align(Alignment.TopStart))
+                            PageHalf(shown, 1, loadedByIndex, left = false, halfWidth, bookPercent, Modifier.align(Alignment.TopEnd))
+                        }
+                        turn != null -> {
+                            SinglePage(turn.to, loadedByIndex, pageWidth, bookPercent)
+                            SinglePage(
+                                turn.from, loadedByIndex, pageWidth, bookPercent,
+                                Modifier.pageCurl({ turner.fold() }, Offset.Zero, CurlPart.FrontWithBack, backPaper),
+                            )
+                        }
+                        else -> SinglePage(shown, loadedByIndex, pageWidth, bookPercent)
                     }
                 }
             }
 
+            ReaderBottomBar(
+                percent = bookPercent,
+                label = pageLabel,
+                modifier = Modifier.riseIn(260),
+            )
+        }
+
+        // Затемнение под шторкой: тап по нему закрывает шторку
+        AnimatedVisibility(
+            visible = sheetOpen,
+            enter = fadeIn(tween(MotionTokens.PANELS_MS)),
+            exit = fadeOut(tween(MotionTokens.PANELS_MS)),
+        ) {
             Box(
                 Modifier
                     .fillMaxSize()
-                    .pointerInput(Unit) {
-                        detectTapGestures { offset ->
-                            when {
-                                offset.x > size.width * 2 / 3 -> turn(true)
-                                offset.x < size.width / 3 -> turn(false)
-                            }
-                        }
-                    }
-                    .pointerInput(Unit) {
-                        var dragged = 0f
-                        detectHorizontalDragGestures(
-                            onDragStart = { dragged = 0f },
-                            onHorizontalDrag = { _, dx -> dragged += dx },
-                            onDragEnd = { if (abs(dragged) > 48.dp.toPx()) turn(dragged < 0) },
-                        )
-                    },
-                contentAlignment = Alignment.TopCenter,
-            ) {
-                if (state.error != null) {
-                    Message(state.error)
-                } else if (shown == null) {
-                    CircularProgressIndicator(Modifier.align(Alignment.Center), color = colors.accent)
-                } else {
-                    AnimatedContent(
-                        targetState = shown,
-                        transitionSpec = {
-                            if (!animate) {
-                                // E-Ink: мгновенная смена страниц, без промежуточных кадров
-                                fadeIn(tween(0)) togetherWith fadeOut(tween(0))
-                            } else {
-                                val forward = targetState.paged.chapterIndex > initialState.paged.chapterIndex ||
-                                    (targetState.paged.chapterIndex == initialState.paged.chapterIndex && targetState.first > initialState.first)
-                                val dir = if (forward) 1 else -1
-                                val spec = tween<IntOffset>(MotionTokens.PAGE_SETTLE_MS, easing = MotionTokens.PageSettle)
-                                slideInHorizontally(spec) { it * dir } togetherWith slideOutHorizontally(spec) { -it * dir / 3 }
-                            }
-                        },
-                        label = "page",
-                    ) { spread ->
-                        if (isSpread) {
-                            Row(
-                                Modifier
-                                    .fillMaxSize()
-                                    .background(colors.paper)
-                                    .padding(horizontal = SpreadPadding),
-                                horizontalArrangement = Arrangement.spacedBy(SpreadGap),
-                            ) {
-                                PageView(spread.paged, spread.first, state.chapter, Modifier.weight(1f))
-                                PageView(spread.paged, spread.first + 1, state.chapter, Modifier.weight(1f))
-                            }
-                        } else {
-                            Box(Modifier.fillMaxSize().background(colors.paper), contentAlignment = Alignment.TopCenter) {
-                                PageView(spread.paged, spread.first, state.chapter, Modifier.width(pageWidth))
-                            }
-                        }
-                    }
-                }
-            }
+                    .background(Color(0x400A0A10))
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { sheetOpen = false },
+            )
         }
-
-        Text(
-            text = footer,
-            style = MaterialTheme.typography.labelMedium,
-            color = colors.inkSecondary,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 12.dp),
-        )
+        AnimatedVisibility(
+            visible = sheetOpen,
+            enter = slideInVertically(tween(MotionTokens.SHEET_MS, easing = MotionTokens.Sheet)) { it } + fadeIn(tween(MotionTokens.PANELS_MS)),
+            exit = slideOutVertically(tween(MotionTokens.PANELS_MS, easing = MotionTokens.Emphasized)) { it } + fadeOut(tween(MotionTokens.PANELS_MS)),
+            modifier = Modifier.align(Alignment.BottomCenter),
+        ) {
+            AppearanceSheet(
+                settings = state.settings,
+                glassState = glassState,
+                onEvent = onEvent,
+                onContents = {
+                    sheetOpen = false
+                    showToc = true
+                },
+            )
+        }
     }
 
     if (showToc) {
-        ModalBottomSheet(onDismissRequest = { showToc = false }, containerColor = colors.paper, contentColor = colors.ink) {
+        ModalBottomSheet(onDismissRequest = { showToc = false }, containerColor = colors.surface, contentColor = colors.ink) {
             TableOfContents(state) { entry ->
                 showToc = false
                 onEvent(ReaderEvent.GoTo(ReadingPosition(entry.chapterIndex, 0)))
@@ -281,37 +334,82 @@ fun ReaderScreen(
     }
 }
 
-/** Куда листать: соседняя страница этой главы или граница соседней главы. null — дальше некуда. */
-private fun targetPosition(spread: Spread, forward: Boolean, step: Int, chapterCount: Int): ReadingPosition? {
-    val chapter = spread.paged.chapterIndex
-    val pages = spread.paged.pages
-    return if (forward) {
-        when {
-            spread.first + step <= pages.lastIndex -> ReadingPosition(chapter, pages[spread.first + step].startOffset)
-            chapter + 1 < chapterCount -> ReadingPosition(chapter + 1, 0)
-            else -> null
-        }
-    } else {
-        when {
-            spread.first > 0 -> ReadingPosition(chapter, pages[(spread.first - step).coerceAtLeast(0)].startOffset)
-            chapter > 0 -> ReadingPosition(chapter - 1, END_OF_CHAPTER)
-            else -> null
-        }
+/** Страница телефона: лист во всю ширину области с непрозрачной бумагой — верхний лист закрывает нижний. */
+@Composable
+private fun SinglePage(
+    spread: Spread,
+    loaded: Map<Int, LoadedChapter>,
+    pageWidth: Dp,
+    progress: Float,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier
+            .fillMaxSize()
+            .paper(ReaderTheme.colors.paper, PageEdges(left = progress, right = 1f - progress)),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        PageView(spread.paged, spread.first, loaded[spread.paged.chapterIndex], Modifier.width(pageWidth))
     }
 }
 
 /**
- * Разрезает загруженную главу на страницы в фоне: длинная глава раскладывается заметное время,
- * а интерфейс в это время не должен замирать. Пока режется новая — возвращается прежний результат.
+ * Половина разворота на планшете: левая ([left]) или правая страница. У корешка бумага чуть темнее,
+ * как у раскрытой книги, где страницы уходят в переплёт.
  */
 @Composable
-private fun rememberPagedChapter(
-    loaded: LoadedChapter?,
+private fun PageHalf(
+    spread: Spread,
+    page: Int,
+    loaded: Map<Int, LoadedChapter>,
+    left: Boolean,
+    width: Dp,
+    progress: Float,
+    modifier: Modifier = Modifier,
+) {
+    val colors = ReaderTheme.colors
+    Box(
+        modifier
+            .width(width)
+            .fillMaxHeight()
+            .paper(colors.paper, if (left) PageEdges(progress, 0f) else PageEdges(0f, 1f - progress))
+            .drawWithContent {
+                drawContent()
+                val fall = SpineShadow.toPx()
+                val edge = if (left) size.width else 0f
+                drawRect(
+                    Brush.horizontalGradient(
+                        0f to Color.Black.copy(alpha = 0.22f),
+                        1f to Color.Transparent,
+                        startX = edge,
+                        endX = if (left) edge - fall else edge + fall,
+                    ),
+                )
+            }
+            .padding(
+                start = if (left) SpreadPadding else SpreadGap / 2,
+                end = if (left) SpreadGap / 2 else SpreadPadding,
+            ),
+    ) {
+        PageView(spread.paged, spread.first + page, loaded[spread.paged.chapterIndex], Modifier.fillMaxWidth())
+    }
+}
+
+/**
+ * Разрезает главы на страницы в фоне: длинная глава раскладывается заметное время,
+ * а интерфейс в это время не должен замирать. Сначала текущая глава, потом соседи —
+ * их страницы нужны, чтобы лист можно было согнуть через границу главы.
+ * Готовые раскладки хранятся, пока не поменялись шрифт, кегль или размер экрана.
+ */
+@Composable
+private fun rememberPagedChapters(
+    chapters: List<LoadedChapter>,
+    current: Int,
     settings: ReaderSettings,
     language: String?,
     width: Int,
     height: Int,
-): PagedChapter? {
+): Map<Int, PagedChapter> {
     val measurer = rememberTextMeasurer(cacheSize = 0)
     val style = remember(settings.font, settings.fontSizeSp, settings.lineSpacing, language) {
         TextStyle(
@@ -324,10 +422,17 @@ private fun rememberPagedChapter(
             localeList = language?.let { runCatching { LocaleList(it) }.getOrNull() },
         )
     }
-    val paged by produceState<PagedChapter?>(null, loaded, style, width, height) {
-        if (loaded == null || width <= 0 || height <= 0) return@produceState
-        value = withContext(Dispatchers.Default) {
-            paginate(measurer, loaded.chapter.index, chapterText(loaded.chapter), style, width, height)
+    val paged = remember(style, width, height) { mutableStateMapOf<Int, PagedChapter>() }
+    LaunchedEffect(chapters, current, paged) {
+        if (width <= 0 || height <= 0) return@LaunchedEffect
+        val wanted = chapters.map { it.chapter.index }.toSet()
+        (paged.keys - wanted).forEach { paged.remove(it) }
+        for (loaded in chapters.sortedBy { if (it.chapter.index == current) 0 else 1 }) {
+            val index = loaded.chapter.index
+            if (index in paged) continue
+            paged[index] = withContext(Dispatchers.Default) {
+                paginate(measurer, index, chapterText(loaded.chapter, ChitalkaFonts.Playfair), style, width, height)
+            }
         }
     }
     return paged
@@ -423,3 +528,6 @@ private fun ReaderScreenPreview() {
         )
     }
 }
+
+/** Проценты для подписи кольца: 0–100 без дробей. */
+internal fun percentLabel(percent: Float): String = "${(percent * 100).roundToInt().coerceIn(0, 100)}%"

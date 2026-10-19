@@ -20,8 +20,8 @@ class SettingsViewModelTest {
         val viewModel = SettingsViewModel(repository)
         viewModel.uiState.test {
             skipItems(1) // начальное состояние «загрузка»
-            viewModel.onEvent(SettingsEvent.ChangeTheme(ReaderThemeMode.DarkWalnut))
-            assertEquals(ReaderThemeMode.DarkWalnut, expectMostRecentItem().settings.theme)
+            viewModel.onEvent(SettingsEvent.ChangeTheme(ReaderThemeMode.Midnight))
+            assertEquals(ReaderThemeMode.Midnight, expectMostRecentItem().settings.theme)
         }
     }
 

@@ -40,6 +40,8 @@ class EpubDocumentTest {
                     <dc:title>Мастер и Маргарита</dc:title>
                     <dc:creator>Михаил Булгаков</dc:creator>
                     <dc:language>ru</dc:language>
+                    <dc:description>&lt;p&gt;Роман о дьяволе.&lt;/p&gt;&lt;p&gt;И о любви.&lt;/p&gt;</dc:description>
+                    <dc:subject>Классика</dc:subject>
                     <meta name="cover" content="cover-img"/>
                     <meta name="calibre:series" content="Романы"/>
                     <meta name="calibre:series_index" content="2.0"/>
@@ -99,7 +101,11 @@ class EpubDocumentTest {
     fun readsMetadataAndCover() {
         EpubDocument.open(epub(withNav = true)).use { doc ->
             assertEquals(
-                BookMetadata("Мастер и Маргарита", "Михаил Булгаков", "Романы", 2, "ru", BookFormat.EPUB),
+                BookMetadata(
+                    "Мастер и Маргарита", "Михаил Булгаков", "Романы", 2, "ru", BookFormat.EPUB,
+                    description = "Роман о дьяволе.\n\nИ о любви.",
+                    genres = listOf("Классика"),
+                ),
                 doc.metadata,
             )
             assertEquals(2, doc.chapterCount)
