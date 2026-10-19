@@ -5,3 +5,9 @@ plugins {
 android {
     namespace = "ru.chitalka.feature.library"
 }
+
+dependencies {
+    // Системное окно выбора файлов (Storage Access Framework): разрешение на память не нужно
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.coil.compose)
+}

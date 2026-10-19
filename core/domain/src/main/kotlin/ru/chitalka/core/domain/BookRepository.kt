@@ -19,4 +19,7 @@ interface BookRepository {
     fun observePosition(bookId: Long): Flow<ReadingPosition?>
 
     suspend fun savePosition(bookId: Long, position: ReadingPosition, percent: Float)
+
+    /** Убирает книгу из шкафа вместе с файлом, обложкой и прогрессом. */
+    suspend fun deleteBook(id: Long)
 }

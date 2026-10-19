@@ -28,16 +28,16 @@ domain не знает ни про Compose, ни про базу.
 | Модуль | Что внутри |
 |---|---|
 | `app` | `MainActivity`, тема, навигация между экранами, адаптивная панель (снизу на телефоне, сбоку на планшете) |
-| `feature:library` | Шкаф: экран, `ShelfViewModel`, сортировка |
-| `feature:reader` | Чтение: страница или разворот, листание тапом по краю |
+| `feature:library` | Шкаф: импорт книг с телефона, обложки, сортировка, удаление долгим нажатием |
+| `feature:reader` | Чтение: пагинация через TextMeasurer, страница или разворот, листание тапом и свайпом, оглавление |
 | `feature:settings` | Оформление: тема, шрифт, кегль, интервал, вибрация |
 | `core:designsystem` | Токены макета v2: цвета трёх тем, анимации, шрифты, хаптика, шкаф на Canvas |
-| `core:domain` | Интерфейсы `BookRepository`, `SettingsRepository` (чистый Kotlin) |
-| `core:model` | Модели: `Book`, `ReadingPosition`, `ReaderSettings` (чистый Kotlin) |
-| `core:data` | Реализации репозиториев поверх базы и DataStore |
+| `core:domain` | Интерфейсы `BookRepository`, `BookContentRepository`, `BookImporter`, `SettingsRepository` (чистый Kotlin) |
+| `core:model` | Модели: `Book`, `Chapter` и блоки текста, `ReadingPosition`, `ReaderSettings` (чистый Kotlin) |
+| `core:data` | Реализации репозиториев поверх базы и DataStore, импорт файлов (копия + SHA-256 против дублей) |
 | `core:database` | Room: 8 таблиц из документа архитектуры, FTS4-поиск |
 | `core:datastore` | Настройки чтения в Preferences DataStore |
-| `core:bookparser` | Единая модель книги и определение формата; парсеры EPUB/FB2 — следующий этап |
+| `core:bookparser` | Определение формата по содержимому, свои парсеры EPUB (spine, nav/NCX) и FB2 (в т. ч. .fb2.zip, windows-1251) |
 | `core:testing` | Фейковые репозитории и правило для тестов ViewModel |
 | `build-logic` | Convention plugins: общая настройка модулей в одном месте |
 
@@ -54,9 +54,9 @@ domain не знает ни про Compose, ни про базу.
 
 ## Этапы
 
-1. **Каркас** — модули, convention plugins, CI, экраны с навигацией. ← мы здесь
-2. Дизайн-система — шрифты в APK, текстуры, резьба шкафа, скриншот-тесты (Roborazzi).
-3. Библиотека — импорт EPUB и FB2, настоящие книги на полках, поиск.
-4. Чтение — пагинация через TextMeasurer, прогресс, оглавление.
+1. **Каркас** — модули, convention plugins, CI, экраны с навигацией. ✓
+2. **Импорт и чтение** — EPUB и FB2 с телефона, пагинация через TextMeasurer, прогресс, оглавление. ← мы здесь
+3. Дизайн-система — шрифты в APK, текстуры, резьба шкафа, скриншот-тесты (Roborazzi).
+4. Библиотека — поиск, полки, серии, сноски и картинки внутри текста.
 5. Премиум-эффекты — 3D-листание (AGSL), бумага, подсветка полок, переходы.
 6. Планшет и доводка — разворот, закладки, Baseline Profile, бета в Google Play.
