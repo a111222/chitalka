@@ -33,4 +33,8 @@ internal class OfflineSettingsRepository @Inject constructor(
     override suspend fun setHapticsEnabled(enabled: Boolean) {
         dataSource.setHapticsEnabled(enabled)
     }
+
+    override suspend fun setShelfLightsOn(on: Boolean) {
+        dataSource.setShelfLightsOn(on)
+    }
 }

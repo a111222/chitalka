@@ -7,11 +7,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import ru.chitalka.core.domain.BookImporter
 import ru.chitalka.core.domain.BookRepository
+import ru.chitalka.core.domain.SettingsRepository
 import ru.chitalka.core.domain.ImportResult
 import ru.chitalka.core.model.Book
 import java.time.Instant
@@ -23,6 +26,8 @@ data class ShelfUiState(
     val sort: ShelfSort = ShelfSort.RecentlyRead,
     val isLoading: Boolean = true,
     val isImporting: Boolean = false,
+    /** Подсветка полок; запоминается между запусками. */
+    val lightsOn: Boolean = true,
     /** Короткое сообщение для снекбара: итог импорта или удаления. */
     val message: String? = null,
 ) {
@@ -46,24 +51,31 @@ sealed interface ShelfEvent {
     data class DeleteBook(val book: Book) : ShelfEvent
 
     data object MessageShown : ShelfEvent
+
+    /** Кнопка-лампа в шапке. */
+    data object ToggleLights : ShelfEvent
 }
 
 @HiltViewModel
 class ShelfViewModel @Inject constructor(
     private val bookRepository: BookRepository,
     private val bookImporter: BookImporter,
+    private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
 
     private val sort = MutableStateFlow(ShelfSort.RecentlyRead)
     private val transient = MutableStateFlow(Transient())
 
+    private val lightsOn = settingsRepository.settings.map { it.shelfLightsOn }.distinctUntilChanged()
+
     val uiState: StateFlow<ShelfUiState> =
-        combine(bookRepository.observeBooks(), sort, transient) { books, sort, transient ->
+        combine(bookRepository.observeBooks(), sort, transient, lightsOn) { books, sort, transient, lightsOn ->
             ShelfUiState(
                 books = books.sortedWith(sort.comparator),
                 sort = sort,
                 isLoading = false,
                 isImporting = transient.isImporting,
+                lightsOn = lightsOn,
                 message = transient.message,
             )
         }.stateIn(
@@ -81,6 +93,9 @@ class ShelfViewModel @Inject constructor(
                 transient.update { it.copy(message = "«${event.book.title}» убрана из шкафа") }
             }
             ShelfEvent.MessageShown -> transient.update { it.copy(message = null) }
+            ShelfEvent.ToggleLights -> viewModelScope.launch {
+                settingsRepository.setShelfLightsOn(!uiState.value.lightsOn)
+            }
         }
     }
 
@@ -123,3 +138,16 @@ private val ShelfSort.comparator: Comparator<Book>
         ShelfSort.Title -> compareBy(String.CASE_INSENSITIVE_ORDER) { it.title }
         ShelfSort.Author -> compareBy<Book, String>(String.CASE_INSENSITIVE_ORDER) { it.author.orEmpty() }.thenBy { it.title }
     }
+
+/** «1 книга», «3 книги», «12 книг» — с правильным окончанием. */
+internal fun booksCountLabel(count: Int): String {
+    val mod100 = count % 100
+    val mod10 = count % 10
+    val word = when {
+        mod100 in 11..14 -> "книг"
+        mod10 == 1 -> "книга"
+        mod10 in 2..4 -> "книги"
+        else -> "книг"
+    }
+    return "$count $word"
+}

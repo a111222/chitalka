@@ -20,6 +20,11 @@ object MotionTokens {
     /** Открытие книги: подъём с полки, затем обложка распахивается. */
     const val BOOK_LIFT_MS = 320
     const val COVER_OPEN_MS = 950
+    /** Книги расставляются по полкам волной: каждая следующая на 9 мс позже. */
+    const val BOOK_STAGGER_MS = 9
+    /** Новая книга опускается на полку сверху; при первом показе шкафа — волной слева направо. */
+    const val BOOK_LAND_MS = 520
+    const val BOOK_LAND_STAGGER_MS = 28
     val CoverOpen: Easing = CubicBezierEasing(0.45f, 0.05f, 0.2f, 1f)
 
     /** Закладка-ленточка падает с пружинящим перелётом. */

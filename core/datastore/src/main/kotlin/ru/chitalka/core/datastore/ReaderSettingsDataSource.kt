@@ -27,6 +27,7 @@ class ReaderSettingsDataSource @Inject constructor(
                 .coerceIn(ReaderSettings.MIN_FONT_SIZE, ReaderSettings.MAX_FONT_SIZE),
             lineSpacing = prefs[Keys.LINE_SPACING].toEnum(defaults.lineSpacing),
             hapticsEnabled = prefs[Keys.HAPTICS] ?: defaults.hapticsEnabled,
+            shelfLightsOn = prefs[Keys.SHELF_LIGHTS] ?: defaults.shelfLightsOn,
         )
     }
 
@@ -42,12 +43,15 @@ class ReaderSettingsDataSource @Inject constructor(
 
     suspend fun setHapticsEnabled(enabled: Boolean) = dataStore.edit { it[Keys.HAPTICS] = enabled }
 
+    suspend fun setShelfLightsOn(on: Boolean) = dataStore.edit { it[Keys.SHELF_LIGHTS] = on }
+
     private object Keys {
         val THEME = stringPreferencesKey("theme")
         val FONT = stringPreferencesKey("font")
         val FONT_SIZE = intPreferencesKey("font_size_sp")
         val LINE_SPACING = stringPreferencesKey("line_spacing")
         val HAPTICS = booleanPreferencesKey("haptics_enabled")
+        val SHELF_LIGHTS = booleanPreferencesKey("shelf_lights_on")
     }
 }
 

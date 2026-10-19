@@ -2,6 +2,32 @@ package ru.chitalka.feature.library
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.offset
+import androidx.compose.material3.IconToggleButton
+import androidx.compose.runtime.key
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.addPathNodes
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -45,19 +71,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import ru.chitalka.core.designsystem.adaptive.LocalWindowWidth
-import ru.chitalka.core.designsystem.bookcase.BookSpinePlaceholder
-import ru.chitalka.core.designsystem.bookcase.Bookcase
-import ru.chitalka.core.designsystem.bookcase.ShelfRow
-import ru.chitalka.core.designsystem.bookcase.verticalText
+import ru.chitalka.core.designsystem.bookcase.BookCoverPlaceholder
+import ru.chitalka.core.designsystem.bookcase.BookSpine
+import ru.chitalka.core.designsystem.bookcase.BookcaseMetrics
+import ru.chitalka.core.designsystem.bookcase.CarvedBookcase
+import ru.chitalka.core.designsystem.bookcase.SpineStyle
+import ru.chitalka.core.designsystem.bookcase.spineStyleFor
+import ru.chitalka.core.designsystem.theme.MotionTokens
 import ru.chitalka.core.designsystem.theme.ReaderTheme
 import ru.chitalka.core.model.Book
 import java.io.File
@@ -65,8 +92,6 @@ import kotlin.math.roundToInt
 
 /** id демонстрационной книги «Сад за рекой»: её можно открыть, пока шкаф пуст. */
 const val SAMPLE_BOOK_ID = 0L
-
-private const val BOOKS_PER_SHELF = 7
 
 @Composable
 internal fun ShelfRoute(
@@ -102,10 +127,24 @@ fun ShelfScreen(
         haptics.bookPicked()
         onOpenBook(id)
     }
+    val toggleLights: () -> Unit = {
+        haptics.toggle(!state.lightsOn)
+        onEvent(ShelfEvent.ToggleLights)
+    }
     var bookToDelete by remember { mutableStateOf<Book?>(null) }
     val askDelete: (Book) -> Unit = { book ->
         haptics.confirm()
         bookToDelete = book
+    }
+    val bookcase: @Composable () -> Unit = {
+        ShelfBookcase(
+            books = state.books,
+            isLoading = state.isLoading,
+            currentBookId = state.continueReading?.id,
+            lightsOn = state.lightsOn,
+            onOpen = onOpenBook,
+            onLongPress = askDelete,
+        )
     }
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(state.message) {
@@ -126,10 +165,10 @@ fun ShelfScreen(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    Header(state.isImporting, onAddBooks)
+                    Header(state, onAddBooks, toggleLights)
                     ContinueCard(state.continueReading, onOpen = openBook, onAddBooks = onAddBooks)
                     SortChips(state, onEvent)
-                    ShelfBookcase(state.books, onOpen = openBook, onLongPress = askDelete)
+                    bookcase()
                 }
             } else {
                 Row(
@@ -139,7 +178,7 @@ fun ShelfScreen(
                     horizontalArrangement = Arrangement.spacedBy(24.dp),
                 ) {
                     Column(Modifier.width(320.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Header(state.isImporting, onAddBooks)
+                        Header(state, onAddBooks, toggleLights)
                         ContinueCard(state.continueReading, onOpen = openBook, onAddBooks = onAddBooks, large = true)
                     }
                     Column(
@@ -149,7 +188,7 @@ fun ShelfScreen(
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
                         SortChips(state, onEvent)
-                        ShelfBookcase(state.books, onOpen = openBook, onLongPress = askDelete)
+                        bookcase()
                     }
                 }
             }
@@ -182,18 +221,27 @@ fun ShelfScreen(
 }
 
 @Composable
-private fun Header(isImporting: Boolean, onAddBooks: () -> Unit) {
+private fun Header(state: ShelfUiState, onAddBooks: () -> Unit, onToggleLights: () -> Unit) {
     val colors = ReaderTheme.colors
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text("Читалка", style = MaterialTheme.typography.headlineLarge)
+            Text("Моя полка", style = MaterialTheme.typography.headlineLarge)
             Text(
-                "Ваш книжный шкаф",
+                if (state.books.isEmpty()) "Всё доступно офлайн" else "${booksCountLabel(state.books.size)} · всё доступно офлайн",
                 style = MaterialTheme.typography.bodyMedium,
                 color = colors.inkSecondary,
             )
         }
-        if (isImporting) {
+        if (!colors.isEInk) {
+            IconToggleButton(checked = state.lightsOn, onCheckedChange = { onToggleLights() }) {
+                Icon(
+                    LampIcon,
+                    contentDescription = "Подсветка полок",
+                    tint = if (state.lightsOn) colors.accent else colors.inkSecondary,
+                )
+            }
+        }
+        if (state.isImporting) {
             CircularProgressIndicator(Modifier.size(24.dp), color = colors.accent, strokeWidth = 2.dp)
         } else {
             FilledTonalButton(
@@ -280,57 +328,188 @@ private fun BookCover(book: Book, modifier: Modifier = Modifier) {
             modifier = modifier.clip(shape),
         )
     } else {
-        Box(modifier.clip(shape), contentAlignment = Alignment.Center) {
-            BookSpinePlaceholder(Modifier.matchParentSize())
-        }
+        BookCoverPlaceholder(book.title, book.author, spineStyleFor(book.id), modifier)
     }
 }
 
+/** Что стоит на полке: книга из базы или демонстрационная, пока шкаф пуст. */
+private data class ShelfEntry(val id: Long, val title: String, val author: String?, val book: Book?)
+
+/**
+ * Шкаф с книгами. Корешки расставляются по настоящей ширине полки: на планшете
+ * помещается больше книг, а сами книги не растягиваются. При первом показе книги
+ * опускаются на полки волной, при смене сортировки переезжают на новые места,
+ * а книга, которую открывают, сначала приподнимается с полки.
+ */
 @Composable
-private fun ShelfBookcase(books: List<Book>, onOpen: (Long) -> Unit, onLongPress: (Book) -> Unit) {
-    val shelves = books.chunked(BOOKS_PER_SHELF)
-    Bookcase(
-        shelfCount = maxOf(3, shelves.size),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(6.dp)),
-    ) { index ->
-        ShelfRow {
-            val shelf = shelves.getOrNull(index)
-            when {
-                shelf != null -> shelf.forEach { book ->
-                    Spine(book.title, onClick = { onOpen(book.id) }, onLongClick = { onLongPress(book) })
+private fun ShelfBookcase(
+    books: List<Book>,
+    isLoading: Boolean,
+    currentBookId: Long?,
+    lightsOn: Boolean,
+    onOpen: (Long) -> Unit,
+    onLongPress: (Book) -> Unit,
+) {
+    val animate = ReaderTheme.animationsEnabled
+    val haptics = ReaderTheme.haptics
+    val scope = rememberCoroutineScope()
+    var pickedId by remember { mutableStateOf<Long?>(null) }
+    // Волна «книги встают на полки» играет один раз; при возврате из читалки шкаф уже расставлен
+    var introPlayed by rememberSaveable { mutableStateOf(false) }
+    var settled by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { settled = true }
+    LaunchedEffect(books.isNotEmpty()) {
+        if (books.isNotEmpty()) {
+            delay(MotionTokens.BOOK_LAND_MS + MAX_LANDING_WAVE * MotionTokens.BOOK_LAND_STAGGER_MS.toLong())
+            introPlayed = true
+        }
+    }
+
+    val entries = when {
+        books.isNotEmpty() -> books.map { ShelfEntry(it.id, it.title, it.author, it) }
+        isLoading -> emptyList()
+        else -> listOf(ShelfEntry(SAMPLE_BOOK_ID, "Сад за рекой", "Демо", null))
+    }
+    val pick: (Long) -> Unit = { id ->
+        if (pickedId == null) {
+            haptics.bookPicked()
+            if (animate) {
+                pickedId = id
+                scope.launch {
+                    delay(MotionTokens.BOOK_LIFT_MS + 110L)
+                    onOpen(id)
+                    delay(MotionTokens.BOOK_LIFT_MS.toLong())
+                    pickedId = null
                 }
-                index == 0 && books.isEmpty() -> Spine("Сад за рекой", onClick = { onOpen(SAMPLE_BOOK_ID) })
+            } else {
+                onOpen(id)
+            }
+        }
+    }
+
+    BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+        val caseWidth = minOf(maxWidth, BookcaseMetrics.MaxWidth)
+        val styles = entries.map { spineStyleFor(it.id) }
+        val slots = arrangeSpines(
+            widths = styles.map { it.width.value },
+            shelfWidth = BookcaseMetrics.shelfWidth(caseWidth).value,
+            gap = BookcaseMetrics.SpineGap.value,
+        )
+        CarvedBookcase(
+            shelfCount = shelfCountFor(slots),
+            lightsOn = lightsOn,
+            modifier = Modifier.width(caseWidth),
+        ) {
+            entries.forEachIndexed { index, entry ->
+                key(entry.id) {
+                    ShelfSpine(
+                        entry = entry,
+                        style = styles[index],
+                        slot = slots[index],
+                        index = index,
+                        isCurrent = entry.id == currentBookId,
+                        isPicked = entry.id == pickedId,
+                        glowing = entry.id == currentBookId && lightsOn,
+                        lands = !introPlayed || settled,
+                        wave = !introPlayed,
+                        onClick = { pick(entry.id) },
+                        onLongClick = entry.book?.let { book -> { onLongPress(book) } },
+                    )
+                }
             }
         }
     }
 }
 
+/** Сколько первых книг участвуют в волне; остальные встают сразу за ними. */
+private const val MAX_LANDING_WAVE = 20
+
 @Composable
-private fun Spine(title: String, onClick: () -> Unit, onLongClick: (() -> Unit)? = null) {
-    Box(
+private fun ShelfSpine(
+    entry: ShelfEntry,
+    style: SpineStyle,
+    slot: SpineSlot,
+    index: Int,
+    isCurrent: Boolean,
+    isPicked: Boolean,
+    glowing: Boolean,
+    lands: Boolean,
+    wave: Boolean,
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)?,
+) {
+    val animate = ReaderTheme.animationsEnabled
+    val height = BookcaseMetrics.ShelfPitch * style.heightFraction
+    // Переезд на новое место при смене сортировки или ширины окна: волной, по 9 мс на книгу
+    val moveSpec: AnimationSpec<Dp> = if (animate) {
+        tween(MotionTokens.MORPH_MS, delayMillis = index * MotionTokens.BOOK_STAGGER_MS, easing = MotionTokens.Emphasized)
+    } else {
+        snap()
+    }
+    val x by animateDpAsState(BookcaseMetrics.ShelfStart + slot.x.dp, moveSpec, label = "spineX")
+    val y by animateDpAsState(BookcaseMetrics.shelfFloor(slot.shelf) - height, moveSpec, label = "spineY")
+    // Открываемая книга поднимается на 26 dp, читаемая сейчас чуть выдвинута вперёд
+    val lift by animateDpAsState(
+        targetValue = when {
+            isPicked -> (-26).dp
+            isCurrent -> (-5).dp
+            else -> 0.dp
+        },
+        animationSpec = if (animate) tween(MotionTokens.BOOK_LIFT_MS, easing = MotionTokens.Emphasized) else snap(),
+        label = "spineLift",
+    )
+    val landing = remember { Animatable(if (animate && lands) 0f else 1f) }
+    LaunchedEffect(Unit) {
+        if (landing.value < 1f) {
+            if (wave) delay(minOf(index, MAX_LANDING_WAVE) * MotionTokens.BOOK_LAND_STAGGER_MS.toLong())
+            landing.animateTo(1f, tween(MotionTokens.BOOK_LAND_MS, easing = MotionTokens.Emphasized))
+        }
+    }
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+
+    BookSpine(
+        title = entry.title,
+        style = style,
+        pressed = pressed,
+        glowing = glowing,
         modifier = Modifier
-            .size(width = 34.dp, height = 116.dp)
+            .offset {
+                val drop = LandingDrop * (1f - landing.value)
+                IntOffset(x.roundToPx(), (y + lift - drop).roundToPx())
+            }
+            .graphicsLayer { alpha = landing.value }
+            .size(width = style.width, height = height)
+            .semantics(mergeDescendants = true) {
+                contentDescription = listOfNotNull(entry.title, entry.author).joinToString(", ")
+            }
             .combinedClickable(
-                onClickLabel = "Открыть книгу «$title»",
-                onLongClickLabel = "Убрать из шкафа",
+                interactionSource = interaction,
+                indication = null,
+                onClickLabel = "Открыть книгу",
+                onLongClickLabel = onLongClick?.let { "Убрать из шкафа" },
                 onLongClick = onLongClick,
                 onClick = onClick,
             ),
-        contentAlignment = Alignment.Center,
-    ) {
-        BookSpinePlaceholder(Modifier.matchParentSize())
-        Text(
-            text = title,
-            modifier = Modifier.verticalText(),
-            color = if (ReaderTheme.colors.isEInk) ReaderTheme.colors.ink else ReaderTheme.colors.paper,
-            fontFamily = FontFamily.Serif,
-            fontSize = 11.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+    )
+}
+
+/** С какой высоты книга опускается на полку. */
+private val LandingDrop = 28.dp
+
+/** Лампа из макета: кнопка подсветки полок. */
+private val LampIcon: ImageVector by lazy {
+    ImageVector.Builder(name = "Lamp", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f)
+        .addPath(
+            pathData = addPathNodes(
+                "M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.7.5 1.1 1.3 1.1 2.2h5c0-.9.4-1.7 1.1-2.2A6 6 0 0 0 12 3z",
+            ),
+            stroke = SolidColor(Color.Black),
+            strokeLineWidth = 1.8f,
+            strokeLineCap = StrokeCap.Round,
+            strokeLineJoin = StrokeJoin.Round,
         )
-    }
+        .build()
 }
 
 @Preview

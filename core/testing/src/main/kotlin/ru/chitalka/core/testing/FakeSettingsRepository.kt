@@ -23,4 +23,6 @@ class FakeSettingsRepository(initial: ReaderSettings = ReaderSettings()) : Setti
     override suspend fun setLineSpacing(spacing: LineSpacing) = state.update { it.copy(lineSpacing = spacing) }
 
     override suspend fun setHapticsEnabled(enabled: Boolean) = state.update { it.copy(hapticsEnabled = enabled) }
+
+    override suspend fun setShelfLightsOn(on: Boolean) = state.update { it.copy(shelfLightsOn = on) }
 }

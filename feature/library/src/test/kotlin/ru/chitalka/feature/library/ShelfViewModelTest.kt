@@ -11,6 +11,7 @@ import ru.chitalka.core.model.Book
 import ru.chitalka.core.model.BookFormat
 import ru.chitalka.core.testing.FakeBookImporter
 import ru.chitalka.core.testing.FakeBookRepository
+import ru.chitalka.core.testing.FakeSettingsRepository
 import ru.chitalka.core.testing.MainDispatcherRule
 import java.time.Instant
 
@@ -28,9 +29,11 @@ class ShelfViewModelTest {
 
     private val importer = FakeBookImporter()
 
+    private val settings = FakeSettingsRepository()
+
     @Test
     fun recentlyReadComesFirstByDefault() = runTest {
-        val viewModel = ShelfViewModel(repository, importer)
+        val viewModel = ShelfViewModel(repository, importer, settings)
         viewModel.uiState.test {
             val state = awaitLoaded()
             assertEquals(listOf(2L, 1L, 3L), state.books.map { it.id })
@@ -40,7 +43,7 @@ class ShelfViewModelTest {
 
     @Test
     fun changingSortReordersBooks() = runTest {
-        val viewModel = ShelfViewModel(repository, importer)
+        val viewModel = ShelfViewModel(repository, importer, settings)
         viewModel.uiState.test {
             awaitLoaded()
             viewModel.onEvent(ShelfEvent.ChangeSort(ShelfSort.Title))
@@ -53,7 +56,7 @@ class ShelfViewModelTest {
     @Test
     fun importReportsResultAndDeleteRemovesBook() = runTest {
         importer.results = listOf(ImportResult.Imported(4, "Мёртвые души"))
-        val viewModel = ShelfViewModel(repository, importer)
+        val viewModel = ShelfViewModel(repository, importer, settings)
         viewModel.uiState.test {
             awaitLoaded()
             viewModel.onEvent(ShelfEvent.ImportBooks(listOf("content://книга.fb2")))
@@ -65,6 +68,25 @@ class ShelfViewModelTest {
             assertEquals("«Белая гвардия» убрана из шкафа", state.message)
         }
         assertEquals(listOf("content://книга.fb2"), importer.imported)
+    }
+
+    @Test
+    fun lampTogglesShelfLightsAndRemembersChoice() = runTest {
+        val viewModel = ShelfViewModel(repository, importer, settings)
+        viewModel.uiState.test {
+            assertEquals(true, awaitLoaded().lightsOn)
+            viewModel.onEvent(ShelfEvent.ToggleLights)
+            assertEquals(false, awaitItem().lightsOn)
+        }
+        assertEquals(false, settings.settings.first().shelfLightsOn)
+    }
+
+    @Test
+    fun booksCountUsesRussianPlurals() {
+        assertEquals(
+            listOf("1 книга", "3 книги", "5 книг", "11 книг", "21 книга", "112 книг"),
+            listOf(1, 3, 5, 11, 21, 112).map(::booksCountLabel),
+        )
     }
 
     @Test

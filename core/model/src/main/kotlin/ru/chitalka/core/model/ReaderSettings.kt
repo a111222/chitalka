@@ -7,6 +7,8 @@ data class ReaderSettings(
     val fontSizeSp: Int = DEFAULT_FONT_SIZE,
     val lineSpacing: LineSpacing = LineSpacing.Normal,
     val hapticsEnabled: Boolean = true,
+    /** Подсветка полок в шкафу: включается кнопкой-лампой на экране библиотеки. */
+    val shelfLightsOn: Boolean = true,
 ) {
     companion object {
         const val MIN_FONT_SIZE = 14
